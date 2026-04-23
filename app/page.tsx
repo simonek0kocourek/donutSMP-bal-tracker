@@ -23,7 +23,7 @@ export default function SignInPage() {
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0f] px-4 py-10">
       {/* LiquidEther full-screen background */}
-      <div className="pointer-events-none absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0" style={{ width: "100%", height: "100%" }}>
         <LiquidEtherBackground
           colors={["#6608ffff", "#6c9ceaff", "#b9acacff"]}
         />

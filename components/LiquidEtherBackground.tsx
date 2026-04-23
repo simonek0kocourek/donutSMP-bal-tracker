@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 
 const LiquidEther = dynamic(() => import("./LiquidEther"), {
   ssr: false,
-  loading: () => <div className="absolute inset-0 bg-[#0a0a0f]" />,
+  loading: () => <div style={{ position: "absolute", inset: 0, background: "#0a0a0f" }} />,
 });
 
 export interface LiquidEtherBackgroundProps {
@@ -15,7 +15,7 @@ export default function LiquidEtherBackground({
   colors = ["#5227FF", "#FF9FFC", "#B497CF"],
 }: LiquidEtherBackgroundProps) {
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative" }}>
+    <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
       <LiquidEther
         colors={colors}
         mouseForce={20}
@@ -35,6 +35,7 @@ export default function LiquidEtherBackground({
         color0={colors[0]}
         color1={colors[1]}
         color2={colors[2]}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
       />
     </div>
   );
