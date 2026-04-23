@@ -57,7 +57,7 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   const secondary = useSessions(compareUser);
   const active = useActiveSession(activeUser);
 
-  const [modal, setModal] = useState<"start" | "end" | null>(null);
+  const [modal, setModal] = useState<"start" | "end" | "reset" | null>(null);
   const [summary, setSummary] = useState<{
     durationMinutes: number;
     earned: number;
@@ -172,6 +172,18 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
       hourlyRate,
       shownAt: Date.now(),
     });
+  };
+
+  const handleResetToday = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayIds = primary.sessions
+      .filter((s) => s.date === today)
+      .map((s) => s.id);
+    for (const id of todayIds) {
+      await primary.removeSession(id);
+    }
+    if (active.active) await active.clear();
+    setModal(null);
   };
 
   const handleSignOut = () => {
@@ -475,6 +487,61 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
           onClose={() => setModal(null)}
           onConfirm={handleEnd}
         />
+      )}
+
+      {/* Reset today floating button */}
+      <button
+        type="button"
+        onClick={() => setModal("reset")}
+        className="fixed bottom-5 right-5 z-40 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50 backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
+      >
+        Reset today
+      </button>
+
+      {/* Reset confirmation modal */}
+      {modal === "reset" && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setModal(null)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+          <div
+            className="relative w-full max-w-sm animate-scale-in rounded-2xl border border-white/10 bg-[#111118]/95 p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-red-400/70">
+              Destructive action
+            </div>
+            <h2 className="mt-1 font-display text-2xl text-white">
+              Reset today's stats?
+            </h2>
+            <p className="mt-2 font-mono text-xs leading-relaxed text-white/50">
+              This will delete all sessions logged today
+              {active.active ? " and clear the open session" : ""}. This cannot
+              be undone.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 font-mono text-xs uppercase tracking-[0.15em] text-white/70 transition-colors hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleResetToday}
+                className="flex-1 rounded-lg px-4 py-2.5 font-mono text-xs uppercase tracking-[0.15em] text-white transition-all hover:-translate-y-0.5"
+                style={{
+                  background: "linear-gradient(135deg, #dc2626, #991b1b)",
+                  boxShadow: "0 4px 16px -4px rgba(220, 38, 38, 0.5)",
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
