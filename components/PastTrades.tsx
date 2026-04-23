@@ -162,49 +162,41 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
               >
                 {formatSignedCurrency(pnl)}
               </div>
-            </div>
 
-            {/* Always-visible: input breakdown + delete on hover */}
-            <div
-              className="mt-2 rounded-xl border border-white/10 px-3 py-2"
-              style={{ background: "rgba(8,8,16,0.85)", backdropFilter: "blur(12px)" }}
-            >
-              {inputs.length > 0 && (
-                <>
-                  <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
-                    Consumed inputs
-                  </div>
-                  <div className="mb-2 space-y-1.5">
-                    {inputs.map((inp) => (
-                      <div key={inp.id} className="flex items-center gap-2">
-                        <img
-                          src={mcItemIconUrl(inp.itemId)}
-                          alt={inp.itemName}
-                          className="h-5 w-5 flex-shrink-0 [image-rendering:pixelated]"
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                        />
-                        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-white/70">
-                          {inp.itemName} ×{inp.quantity}
-                        </span>
-                        <span className="font-mono text-[10px] tabular-nums text-white/45">
-                          {formatCurrency(inp.buyPriceTotal)}
-                        </span>
-                        <span className="font-mono text-[10px] tabular-nums text-white/30">
-                          {fmtDayMonthTime(inp.buyTime)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              {/* Delete */}
               <button
                 type="button"
                 onClick={() => onDelete([sell.id, ...inputs.map((i) => i.id)])}
-                className="w-full rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-red-400 transition-colors hover:bg-red-500/20"
+                className="flex-shrink-0 rounded border border-red-500/20 bg-red-500/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-red-400/70 transition-colors hover:bg-red-500/20 hover:text-red-400"
               >
-                Delete trade
+                del
               </button>
             </div>
+
+            {/* Always-visible: consumed inputs inline */}
+            {inputs.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                {inputs.map((inp) => (
+                  <div key={inp.id} className="flex items-center gap-2 pl-7">
+                    <img
+                      src={mcItemIconUrl(inp.itemId)}
+                      alt={inp.itemName}
+                      className="h-4 w-4 flex-shrink-0 [image-rendering:pixelated]"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-white/40">
+                      {inp.itemName} ×{inp.quantity}
+                    </span>
+                    <span className="font-mono text-[10px] tabular-nums text-white/30">
+                      {formatCurrency(inp.buyPriceTotal)}
+                    </span>
+                    <span className="font-mono text-[10px] tabular-nums text-white/20">
+                      {fmtDayMonthTime(inp.buyTime)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
