@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import SignInButton from "@/components/SignInButton";
+import DotGrid from "@/components/DotGrid";
 import { useUser } from "@/hooks/useUser";
 import type { UserId } from "@/lib/types";
 
@@ -20,20 +21,34 @@ export default function SignInPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-navy px-4 py-10">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0f] px-4 py-10">
+      {/* DotGrid full-screen background */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <DotGrid
+          dotSize={5}
+          gap={15}
+          baseColor="#2F293A"
+          activeColor="#5227FF"
+          proximity={120}
+          shockRadius={250}
+          shockStrength={5}
+          resistance={750}
+          returnDuration={1.5}
+        />
+      </div>
+
+      {/* Subtle vignette so card pops */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 z-[1]"
         style={{
           background:
-            "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(124,58,237,0.18), transparent 65%), radial-gradient(ellipse 60% 40% at 50% 80%, rgba(59,130,246,0.10), transparent 70%)",
+            "radial-gradient(ellipse 60% 60% at 50% 50%, transparent 40%, rgba(0,0,0,0.65) 100%)",
         }}
       />
-      <div className="grid-mask" />
-      <div className="grain" />
 
       <div className="relative z-10 w-full max-w-sm animate-scale-in">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl shadow-2xl">
+        <div className="rounded-2xl border border-white/10 bg-black/40 p-8 backdrop-blur-xl shadow-2xl">
           <div className="text-center">
             <div className="text-5xl">🍩</div>
             <h1 className="mt-3 font-display text-3xl text-white">

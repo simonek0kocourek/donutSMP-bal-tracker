@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import CountUp from "@/components/CountUp";
+import DotGrid from "@/components/DotGrid";
 import PortfolioChart from "@/components/PortfolioChart";
 import SessionModal from "@/components/SessionModal";
 import SessionTable from "@/components/SessionTable";
@@ -194,13 +195,30 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
 
   return (
     <main
-      className="relative min-h-screen overflow-x-hidden"
-      style={{
-        backgroundColor: theme.bg,
-        background: `radial-gradient(ellipse 80% 50% at 50% -10%, ${theme.glow}, transparent 65%), ${theme.bg}`,
-      }}
+      className="relative min-h-screen overflow-x-hidden bg-[#0a0a0f]"
     >
-      <div className="grain" />
+      {/* DotGrid full-screen fixed background */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <DotGrid
+          dotSize={5}
+          gap={15}
+          baseColor="#2F293A"
+          activeColor={theme.line}
+          proximity={120}
+          shockRadius={250}
+          shockStrength={5}
+          resistance={750}
+          returnDuration={1.5}
+        />
+      </div>
+      {/* Per-user accent glow overlay */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[1]"
+        style={{
+          background: `radial-gradient(ellipse 80% 50% at 50% -5%, ${theme.glow}, transparent 60%)`,
+        }}
+      />
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         <header

@@ -1,13 +1,19 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 import type { Session } from "./types";
 
-const EURO_FORMATTER = new Intl.NumberFormat("en-US", {
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+const USD_FORMATTER = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const COMPACT_EURO = new Intl.NumberFormat("en-US", {
+const USD_COMPACT = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   notation: "compact",
@@ -16,12 +22,12 @@ const COMPACT_EURO = new Intl.NumberFormat("en-US", {
 
 export function formatCurrency(value: number): string {
   if (!Number.isFinite(value)) return "$0.00";
-  return EURO_FORMATTER.format(value);
+  return USD_FORMATTER.format(value);
 }
 
 export function formatCurrencyCompact(value: number): string {
   if (!Number.isFinite(value)) return "$0";
-  return COMPACT_EURO.format(value);
+  return USD_COMPACT.format(value);
 }
 
 export function formatSignedCurrency(value: number): string {
@@ -36,7 +42,7 @@ export function parseDecimalInput(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  // Check for shorthand suffixes: m/M = million (×1e6), b/B = billion (×1e9)
+  // Shorthand: m/M = million (×1e6), b/B = billion (×1e9)
   const shorthand = trimmed.match(/^([0-9.,]+)\s*([mMbB])$/);
   if (shorthand) {
     const numPart = shorthand[1]!;
@@ -101,7 +107,10 @@ export function formatPercent(value: number, decimals = 2): string {
 }
 
 export function newSessionId(): string {
-  if (typeof globalThis.crypto !== "undefined" && "randomUUID" in globalThis.crypto) {
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    "randomUUID" in globalThis.crypto
+  ) {
     try {
       return globalThis.crypto.randomUUID();
     } catch {}

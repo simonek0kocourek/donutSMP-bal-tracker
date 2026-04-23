@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { DM_Mono } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
 const fodax = localFont({
   src: "../public/fonts/Fodax.ttf",
@@ -27,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${fodax.variable} ${dmMono.variable}`}>
-      <body className="min-h-screen bg-navy text-white antialiased">
+    <html lang="en" className={cn(fodax.variable, dmMono.variable)}>
+      <body className="min-h-screen bg-[#0a0a0f] text-white antialiased">
         {children}
       </body>
     </html>
