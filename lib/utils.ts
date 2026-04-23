@@ -6,35 +6,37 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const USD_FORMATTER = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
-const USD_COMPACT = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+function fmtAmount(abs: number): string {
+  if (abs >= 1_000_000) {
+    const n = round2(abs / 1_000_000);
+    return `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}m`;
+  }
+  if (abs >= 1_000) {
+    const n = round2(abs / 1_000);
+    return `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}k`;
+  }
+  return round2(abs).toFixed(2);
+}
 
 export function formatCurrency(value: number): string {
-  if (!Number.isFinite(value)) return "$0.00";
-  return USD_FORMATTER.format(value);
+  if (!Number.isFinite(value)) return "$0";
+  return `$${fmtAmount(Math.abs(value))}`;
 }
 
 export function formatCurrencyCompact(value: number): string {
-  if (!Number.isFinite(value)) return "$0";
-  return USD_COMPACT.format(value);
+  return formatCurrency(value);
 }
 
 export function formatSignedCurrency(value: number): string {
-  const base = formatCurrency(Math.abs(value));
-  if (value > 0) return `+${base}`;
-  if (value < 0) return `-${base}`;
-  return base;
+  if (!Number.isFinite(value)) return "$0";
+  const abs = Math.abs(value);
+  if (value > 0) return `+$${fmtAmount(abs)}`;
+  if (value < 0) return `-$${fmtAmount(abs)}`;
+  return `$${fmtAmount(abs)}`;
 }
 
 export function parseDecimalInput(raw: string): number | null {
@@ -42,14 +44,14 @@ export function parseDecimalInput(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  // Shorthand: m/M = million (×1e6), b/B = billion (×1e9)
-  const shorthand = trimmed.match(/^([0-9.,]+)\s*([mMbB])$/);
+  // Shorthand: k/K = thousand, m/M = million, b/B = billion
+  const shorthand = trimmed.match(/^([0-9.,]+)\s*([kKmMbB])$/);
   if (shorthand) {
     const numPart = shorthand[1]!;
     const suffix = shorthand[2]!.toLowerCase();
     const base = parseDecimalInput(numPart);
     if (base === null) return null;
-    const multiplier = suffix === "b" ? 1_000_000_000 : 1_000_000;
+    const multiplier = suffix === "k" ? 1_000 : suffix === "b" ? 1_000_000_000 : 1_000_000;
     return base * multiplier;
   }
 
