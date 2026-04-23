@@ -288,28 +288,6 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
               textShadow: `0 0 30px ${theme.glow}, 0 0 60px ${theme.glow}`,
             }}
           />
-          <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-xs">
-            {annual != null && (
-              <span
-                className="inline-flex items-center gap-1"
-                style={{ color: annual >= 0 ? "#4ade80" : "#f87171" }}
-              >
-                {annual >= 0 ? "↑" : "↓"} {formatPercent(annual)} p.a.
-              </span>
-            )}
-            {totalSessions > 0 && (
-              <span
-                style={{
-                  color: overallChange >= 0 ? "#4ade80" : "#f87171",
-                }}
-              >
-                <CountUp
-                  value={overallChange}
-                  format={formatSignedCurrency}
-                />
-              </span>
-            )}
-          </div>
         </section>
 
         <section
