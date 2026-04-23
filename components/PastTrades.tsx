@@ -131,9 +131,10 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
                       <span className="font-display text-sm text-white/80">{inp.itemName}</span>
                       <span className="font-mono text-[10px] text-white/35">×{inp.quantity}</span>
                       <span className="font-mono text-[10px] text-white/20">{formatCurrency(inp.buyPriceTotal)}</span>
-                      {isHovered && (
-                        <span className="font-mono text-[10px] text-white/20">&middot; {fmtDayMonthTime(inp.buyTime)}</span>
-                      )}
+                      <span
+                        className="overflow-hidden whitespace-nowrap font-mono text-[10px] text-white/20 transition-all duration-300 ease-out"
+                        style={{ maxWidth: isHovered ? "200px" : "0px", opacity: isHovered ? 1 : 0 }}
+                      >&middot; {fmtDayMonthTime(inp.buyTime)}</span>
                     </div>
                   ))}
                 </div>
@@ -155,11 +156,17 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
                     <span className="truncate font-display text-sm text-white">{out.itemName}</span>
                     <span className="font-mono text-[10px] text-white/35">×{out.quantity}</span>
                     <span className="font-mono text-[10px] text-white/20">{formatCurrency(out.sellPriceTotal)}</span>
-                    {isHovered && oi === 0 && (
-                      <span className="font-mono text-[10px] text-white/20">&middot; {fmtDayMonthTime(sell.sellTime!)}</span>
-                    )}
-                    {!isHovered && oi === 0 && (
-                      <span className="font-mono text-[10px] text-white/20">&middot; {fmtDayMonth(sell.sellTime!)}</span>
+                    {oi === 0 && (
+                      <>
+                        <span
+                          className="overflow-hidden whitespace-nowrap font-mono text-[10px] text-white/20 transition-all duration-300 ease-out"
+                          style={{ maxWidth: isHovered ? "0px" : "80px", opacity: isHovered ? 0 : 1 }}
+                        >&middot; {fmtDayMonth(sell.sellTime!)}</span>
+                        <span
+                          className="overflow-hidden whitespace-nowrap font-mono text-[10px] text-white/20 transition-all duration-300 ease-out"
+                          style={{ maxWidth: isHovered ? "200px" : "0px", opacity: isHovered ? 1 : 0 }}
+                        >&middot; {fmtDayMonthTime(sell.sellTime!)}</span>
+                      </>
                     )}
                   </div>
                 ))}
