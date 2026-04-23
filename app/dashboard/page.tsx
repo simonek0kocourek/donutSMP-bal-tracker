@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import CountUp from "@/components/CountUp";
-import DotGrid from "@/components/DotGrid";
+import SilkBackground from "@/components/SilkBackground";
 import PortfolioChart from "@/components/PortfolioChart";
 import SessionModal from "@/components/SessionModal";
 import SessionTable from "@/components/SessionTable";
@@ -197,18 +197,14 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
     <main
       className="relative min-h-screen overflow-x-hidden bg-[#0a0a0f]"
     >
-      {/* DotGrid full-screen fixed background */}
+      {/* Silk full-screen fixed background */}
       <div className="pointer-events-none fixed inset-0 z-0">
-        <DotGrid
-          dotSize={5}
-          gap={15}
-          baseColor="#2F293A"
-          activeColor={theme.line}
-          proximity={120}
-          shockRadius={250}
-          shockStrength={5}
-          resistance={750}
-          returnDuration={1.5}
+        <SilkBackground
+          speed={5}
+          scale={1}
+          color={theme.accent}
+          noiseIntensity={1.5}
+          rotation={0}
         />
       </div>
       {/* Per-user accent glow overlay */}

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import SignInButton from "@/components/SignInButton";
-import DotGrid from "@/components/DotGrid";
+import SilkBackground from "@/components/SilkBackground";
 import { useUser } from "@/hooks/useUser";
 import type { UserId } from "@/lib/types";
 
@@ -22,18 +22,14 @@ export default function SignInPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0f] px-4 py-10">
-      {/* DotGrid full-screen background */}
+      {/* Silk full-screen background */}
       <div className="pointer-events-none absolute inset-0 z-0">
-        <DotGrid
-          dotSize={5}
-          gap={15}
-          baseColor="#2F293A"
-          activeColor="#5227FF"
-          proximity={120}
-          shockRadius={250}
-          shockStrength={5}
-          resistance={750}
-          returnDuration={1.5}
+        <SilkBackground
+          speed={5}
+          scale={1}
+          color="#6d28d9"
+          noiseIntensity={1.5}
+          rotation={0}
         />
       </div>
 
