@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+
 import type { StashEntry, StashOutputItem, UserId } from "@/lib/types";
 import { USER_THEMES } from "@/lib/types";
 import { formatCurrency, formatSignedCurrency } from "@/lib/utils";
@@ -68,8 +68,6 @@ type Props = {
 
 export default function PastTrades({ user, stash, onDelete }: Props) {
   const theme = USER_THEMES[user];
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-
   const trades = buildTrades(stash);
   const maxAbsPnl = Math.max(...trades.map((t) => Math.abs(t.pnl)), 1);
 
@@ -94,16 +92,13 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
       </div>
 
       {trades.map(({ sell, inputs, outputs, pnl }, rank) => {
-        const isHovered = hoveredId === sell.id;
         const isProfit = pnl >= 0;
         const barWidth = (Math.abs(pnl) / maxAbsPnl) * 55;
 
         return (
           <div
             key={sell.id}
-            className={`relative border-t border-white/5 px-4 py-3 transition-colors ${isHovered ? "bg-white/[0.025]" : ""}`}
-            onMouseEnter={() => setHoveredId(sell.id)}
-            onMouseLeave={() => setHoveredId(null)}
+            className="relative border-t border-white/5 px-4 py-3"
           >
             {/* P&L bar */}
             <div
@@ -169,49 +164,47 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
               </div>
             </div>
 
-            {/* Hover: input breakdown + delete */}
-            {isHovered && (
-              <div
-                className="mt-2 rounded-xl border border-white/10 px-3 py-2"
-                style={{ background: "rgba(8,8,16,0.85)", backdropFilter: "blur(12px)" }}
+            {/* Always-visible: input breakdown + delete on hover */}
+            <div
+              className="mt-2 rounded-xl border border-white/10 px-3 py-2"
+              style={{ background: "rgba(8,8,16,0.85)", backdropFilter: "blur(12px)" }}
+            >
+              {inputs.length > 0 && (
+                <>
+                  <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
+                    Consumed inputs
+                  </div>
+                  <div className="mb-2 space-y-1.5">
+                    {inputs.map((inp) => (
+                      <div key={inp.id} className="flex items-center gap-2">
+                        <img
+                          src={mcItemIconUrl(inp.itemId)}
+                          alt={inp.itemName}
+                          className="h-5 w-5 flex-shrink-0 [image-rendering:pixelated]"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-white/70">
+                          {inp.itemName} ×{inp.quantity}
+                        </span>
+                        <span className="font-mono text-[10px] tabular-nums text-white/45">
+                          {formatCurrency(inp.buyPriceTotal)}
+                        </span>
+                        <span className="font-mono text-[10px] tabular-nums text-white/30">
+                          {fmtDayMonthTime(inp.buyTime)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => onDelete([sell.id, ...inputs.map((i) => i.id)])}
+                className="w-full rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-red-400 transition-colors hover:bg-red-500/20"
               >
-                {inputs.length > 0 && (
-                  <>
-                    <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
-                      Consumed inputs
-                    </div>
-                    <div className="mb-2 space-y-1.5">
-                      {inputs.map((inp) => (
-                        <div key={inp.id} className="flex items-center gap-2">
-                          <img
-                            src={mcItemIconUrl(inp.itemId)}
-                            alt={inp.itemName}
-                            className="h-5 w-5 flex-shrink-0 [image-rendering:pixelated]"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                          />
-                          <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-white/70">
-                            {inp.itemName} ×{inp.quantity}
-                          </span>
-                          <span className="font-mono text-[10px] tabular-nums text-white/45">
-                            {formatCurrency(inp.buyPriceTotal)}
-                          </span>
-                          <span className="font-mono text-[10px] tabular-nums text-white/30">
-                            {fmtDayMonthTime(inp.buyTime)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onDelete([sell.id, ...inputs.map((i) => i.id)])}
-                  className="w-full rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-red-400 transition-colors hover:bg-red-500/20"
-                >
-                  Delete trade
-                </button>
-              </div>
-            )}
+                Delete trade
+              </button>
+            </div>
           </div>
         );
       })}
