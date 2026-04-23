@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ActiveSession, Session, StashEntry, UserId } from "@/lib/types";
+import type { ActiveSession, Session, UserId } from "@/lib/types";
 import { USER_THEMES } from "@/lib/types";
 import {
   formatCurrency,
@@ -27,7 +27,6 @@ type ChartPoint = {
   secondary?: number;
   primaryEarned?: number;
   primaryHourlyRate?: number;
-  primaryStashed?: number;
 };
 
 type Props = {
@@ -39,8 +38,6 @@ type Props = {
   primaryLiveBalance: number | null;
   secondaryActive: ActiveSession | null;
   secondaryLiveBalance: number | null;
-  primaryStash?: StashEntry[];
-  secondaryStash?: StashEntry[];
 };
 
 function buildSeries(
@@ -62,16 +59,6 @@ function buildSeries(
   return points;
 }
 
-// Returns total open stash value (at buy price) at a given timestamp.
-// Positions bought BEFORE or AT `atTime` and not yet sold (or sold AFTER `atTime`) count.
-function openStashAt(stash: StashEntry[], atTime: number): number {
-  return stash.reduce((sum, e) => {
-    const buyT = new Date(e.buyTime).getTime();
-    const sellT = e.sellTime ? new Date(e.sellTime).getTime() : Infinity;
-    if (buyT <= atTime && sellT > atTime) return sum + e.buyPriceTotal;
-    return sum;
-  }, 0);
-}
 
 export default function PortfolioChart({
   primaryUser,
@@ -82,8 +69,6 @@ export default function PortfolioChart({
   primaryLiveBalance,
   secondaryActive,
   secondaryLiveBalance,
-  primaryStash = [],
-  secondaryStash = [],
 }: Props) {
   const primaryTheme = USER_THEMES[primaryUser];
   const secondaryTheme = USER_THEMES[secondaryUser];
@@ -101,16 +86,9 @@ export default function PortfolioChart({
       secondarySeries.push({ time: liveTime, value: secondaryLiveBalance });
     }
 
-    // Also include stash buy/sell times as chart points so transitions are exact
-    const stashTimes = [
-      ...primaryStash.map((e) => new Date(e.buyTime).getTime()),
-      ...primaryStash.filter((e) => e.sellTime).map((e) => new Date(e.sellTime!).getTime()),
-    ];
-
     const times = new Set<number>();
     primarySeries.forEach((p) => times.add(p.time));
     secondarySeries.forEach((p) => times.add(p.time));
-    stashTimes.forEach((t) => times.add(t));
 
     const sortedTimes = [...times].sort((a, b) => a - b);
 
@@ -129,20 +107,16 @@ export default function PortfolioChart({
       if (pIn) lastPrimary = pIn.value;
       if (sIn) lastSecondary = sIn.value;
 
-      const stashedPrimary = openStashAt(primaryStash, t);
-      const liquidPrimary = lastPrimary ?? 0;
-
       points.push({
         time: t,
-        primary: lastPrimary != null ? liquidPrimary + stashedPrimary : undefined,
+        primary: lastPrimary,
         secondary: lastSecondary,
         primaryEarned: pIn?.earned,
         primaryHourlyRate: pIn?.hourly,
-        primaryStashed: stashedPrimary > 0 ? stashedPrimary : undefined,
       });
     }
     return points;
-  }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance, secondaryActive, secondaryLiveBalance, primaryStash, secondaryStash]);
+  }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance, secondaryActive, secondaryLiveBalance]);
 
   const { yDomain, yTicks } = useMemo<{ yDomain: [number, number]; yTicks: number[] }>(() => {
     const allValues: number[] = [];
@@ -283,13 +257,7 @@ export default function PortfolioChart({
                         <span className="font-display text-sm">{formatCurrency(point.primary)}</span>
                       </div>
                     )}
-                    {point.primaryStashed != null && (
-                      <div className="flex items-center justify-between gap-4 text-amber-400/80">
-                        <span className="uppercase tracking-wide">Stashed</span>
-                        <span className="font-display text-sm">{formatCurrency(point.primaryStashed)}</span>
-                      </div>
-                    )}
-                    {point.secondary != null && (
+{point.secondary != null && (
                       <div className="flex items-center justify-between gap-4" style={{ color: secondaryTheme.line }}>
                         <span className="uppercase tracking-wide">{secondaryUser}</span>
                         <span className="font-display text-sm">{formatCurrency(point.secondary)}</span>

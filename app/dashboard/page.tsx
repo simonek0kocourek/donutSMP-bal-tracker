@@ -124,12 +124,12 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   const stashPnl = useMemo(
     () =>
       stashHook.stash
-        .filter((e) => e.sellPriceTotal != null && !e.consumedBySellId)
+        .filter((e) => e.sellPriceTotal != null && e.sellPriceTotal > 0 && !e.consumedBySellId)
         .reduce((sum, e) => sum + (e.sellPriceTotal! - e.buyPriceTotal), 0),
     [stashHook.stash],
   );
 
-  const headlineBalance = liquidBalance + totalOpenStash;
+  const headlineBalance = liquidBalance;
 
   const annual = useMemo(() => {
     if (!first) return null;
@@ -453,8 +453,6 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
             secondaryLiveBalance={
               compareActive.active ? compareActive.active.startBalance : null
             }
-            primaryStash={stashHook.stash}
-            secondaryStash={compareStash.stash}
           />
         </section>
 
@@ -538,7 +536,13 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
               <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
                 Past Trades
               </div>
-              <PastTrades user={activeUser} stash={stashHook.stash} />
+              <PastTrades
+                user={activeUser}
+                stash={stashHook.stash}
+                onDelete={async (ids) => {
+                  for (const id of ids) await stashHook.removeEntry(id);
+                }}
+              />
             </div>
           )}
         </section>

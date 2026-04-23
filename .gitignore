@@ -17,3 +17,5 @@ yarn-error.log*
 next-env.d.ts
 .vercel
 .turbo
+
+local-data/

@@ -240,19 +240,21 @@ function AddForm({
     return () => window.clearInterval(id);
   }, []);
 
+  const parsedQty = parseDecimalInput(qty) ?? 0;
+  const parsedPriceEach = parseDecimalInput(price);
+  const totalBuy = parsedPriceEach !== null && parsedQty > 0 ? parsedPriceEach * parsedQty : null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) { setError("Pick an item first"); return; }
-    const parsedQty = parseDecimalInput(qty);
     if (!parsedQty || parsedQty <= 0) { setError("Enter a valid quantity"); return; }
-    const parsedPrice = parseDecimalInput(price);
-    if (parsedPrice === null || parsedPrice < 0) { setError("Enter a valid price"); return; }
+    if (parsedPriceEach === null || parsedPriceEach < 0) { setError("Enter a valid price"); return; }
     const entry: StashEntry = {
       id: newId(),
       itemId: selected.id,
       itemName: selected.name,
       quantity: parsedQty,
-      buyPriceTotal: parsedPrice,
+      buyPriceTotal: parsedPriceEach * parsedQty,
       buyTime: new Date().toISOString(),
     };
     onConfirm(entry);
@@ -288,7 +290,7 @@ function AddForm({
       </label>
 
       <label className="mt-4 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Total buy price</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Price per item</span>
         <div
           className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
           style={{ background: "rgba(255,255,255,0.06)" }}
@@ -304,6 +306,13 @@ function AddForm({
           />
         </div>
       </label>
+
+      {totalBuy !== null && parsedQty > 1 && (
+        <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/45">
+          <span>{formatCurrency(parsedPriceEach!)} × {parsedQty} =</span>
+          <span className="tabular-nums text-white/70">{formatCurrency(totalBuy)}</span>
+        </div>
+      )}
 
       <div className="mt-3 font-mono text-[10px] text-white/35">
         <span className="uppercase tracking-[0.15em]">Timestamp </span>
@@ -338,15 +347,19 @@ function AddForm({
 
 // ─── Sell form ────────────────────────────────────────────────────────────────
 
+type OutputRow = { id: string; item: McItem | null; qty: string; price: string };
+
+function newOutputRow(): OutputRow {
+  return { id: Math.random().toString(36).slice(2), item: null, qty: "1", price: "" };
+}
+
 function SellForm({
   openEntries,
   onClose,
   onConfirm,
   theme,
 }: SellProps & { theme: UserTheme }) {
-  const [selectedItem, setSelectedItem] = useState<McItem | null>(null);
-  const [qty, setQty] = useState("1");
-  const [price, setPrice] = useState("");
+  const [outputs, setOutputs] = useState<OutputRow[]>([newOutputRow()]);
   const [consumedIds, setConsumedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().toISOString());
@@ -360,8 +373,14 @@ function SellForm({
     .filter((e) => consumedIds.has(e.id))
     .reduce((sum, e) => sum + e.buyPriceTotal, 0);
 
-  const parsedPrice = parseDecimalInput(price);
-  const previewPnl = parsedPrice !== null ? parsedPrice - totalCost : null;
+  const totalRevenue = outputs.reduce((sum, o) => {
+    const p = parseDecimalInput(o.price);
+    const q = parseDecimalInput(o.qty) ?? 1;
+    return sum + (p !== null ? p * q : 0);
+  }, 0);
+
+  const allPricesFilled = outputs.every((o) => parseDecimalInput(o.price) !== null && o.price.trim() !== "");
+  const previewPnl = allPricesFilled ? totalRevenue - totalCost : null;
 
   const toggleConsumed = (id: string) => {
     setConsumedIds((prev) => {
@@ -371,34 +390,61 @@ function SellForm({
     });
   };
 
+  const updateOutput = (id: string, patch: Partial<OutputRow>) => {
+    setOutputs((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    setError(null);
+  };
+
+  const addOutput = () => setOutputs((prev) => [...prev, newOutputRow()]);
+  const removeOutput = (id: string) => setOutputs((prev) => prev.filter((o) => o.id !== id));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedItem) { setError("Pick the item you're selling"); return; }
-    const parsedQty = parseDecimalInput(qty);
-    if (!parsedQty || parsedQty <= 0) { setError("Enter a valid quantity"); return; }
-    if (parsedPrice === null || parsedPrice < 0) { setError("Enter a valid sell price"); return; }
 
-    const now = new Date().toISOString();
+    for (const o of outputs) {
+      if (!o.item) { setError("Pick an item for each output row"); return; }
+      const q = parseDecimalInput(o.qty);
+      if (!q || q <= 0) { setError("Enter a valid quantity for each output"); return; }
+      const p = parseDecimalInput(o.price);
+      if (p === null || p < 0) { setError("Enter a valid sell price for each output"); return; }
+    }
+
+    const ts = new Date().toISOString();
     const sellId = newId();
-
     const consumed = openEntries.filter((e) => consumedIds.has(e.id));
 
+    const outputItems = outputs.map((o) => {
+      const q = parseDecimalInput(o.qty)!;
+      const priceEach = parseDecimalInput(o.price)!;
+      return {
+        itemId: o.item!.id,
+        itemName: o.item!.name,
+        quantity: q,
+        sellPriceTotal: priceEach * q,
+      };
+    });
+
+    const totalSell = outputItems.reduce((s, o) => s + o.sellPriceTotal, 0);
+
+    // Primary display item = first output
+    const primary = outputs[0]!;
     const sellEntry: StashEntry = {
       id: sellId,
-      itemId: selectedItem.id,
-      itemName: selectedItem.name,
-      quantity: parsedQty,
+      itemId: primary.item!.id,
+      itemName: primary.item!.name,
+      quantity: parseDecimalInput(primary.qty)!,
       buyPriceTotal: totalCost,
-      buyTime: now,
-      sellPriceTotal: parsedPrice,
-      sellTime: now,
+      buyTime: ts,
+      sellPriceTotal: totalSell,
+      sellTime: ts,
+      outputItems,
       consumedEntryIds: consumed.map((e) => e.id),
     };
 
     const closedInputs: StashEntry[] = consumed.map((e) => ({
       ...e,
       sellPriceTotal: 0,
-      sellTime: now,
+      sellTime: ts,
       consumedBySellId: sellId,
     }));
 
@@ -410,55 +456,97 @@ function SellForm({
       <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Stash</div>
       <h2 className="mt-1 font-display text-2xl text-white">Sell stashed</h2>
 
-      {/* What are you selling */}
+      {/* Output rows */}
       <div className="mt-5">
-        <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
-          Item you&apos;re selling
-        </label>
-        <div className="mt-2">
-          <ItemSearch
-            value={selectedItem}
-            onChange={(item) => { setSelectedItem(item); setError(null); }}
-            placeholder="Search items…"
-          />
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
+            What you&apos;re selling
+          </span>
+          <button
+            type="button"
+            onClick={addOutput}
+            className="font-mono text-[10px] uppercase tracking-[0.15em] transition-colors"
+            style={{ color: theme.line }}
+          >
+            + Add output
+          </button>
         </div>
+
+        <div className="space-y-2">
+          {outputs.map((row, i) => (
+            <div key={row.id} className="rounded-xl border border-white/10 p-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">Output {i + 1}</span>
+                {outputs.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeOutput(row.id)}
+                    className="font-mono text-[10px] text-white/30 hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <div className="mt-2">
+                <ItemSearch
+                  value={row.item}
+                  onChange={(item) => updateOutput(row.id, { item })}
+                  placeholder="Search items…"
+                />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div
+                  className="flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2 focus-within:border-white/35"
+                  style={{ background: "rgba(255,255,255,0.05)" }}
+                >
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={row.qty}
+                    onChange={(e) => updateOutput(row.id, { qty: e.target.value })}
+                    placeholder="Qty"
+                    className="w-full bg-transparent font-display text-base text-white outline-none placeholder:text-white/20"
+                  />
+                </div>
+                <div
+                  className="flex items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 focus-within:border-white/35"
+                  style={{ background: "rgba(255,255,255,0.05)" }}
+                >
+                  <span className="font-display text-base text-white/40">$</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Per item"
+                    value={row.price}
+                    onChange={(e) => updateOutput(row.id, { price: e.target.value })}
+                    className="w-full bg-transparent font-display text-base text-white outline-none placeholder:text-white/20"
+                  />
+                </div>
+              </div>
+              {(() => {
+                const q = parseDecimalInput(row.qty) ?? 0;
+                const p = parseDecimalInput(row.price);
+                if (p !== null && q > 1) {
+                  return (
+                    <div className="mt-1.5 flex justify-between font-mono text-[10px] text-white/40">
+                      <span>{formatCurrency(p)} × {q}</span>
+                      <span className="tabular-nums text-white/60">{formatCurrency(p * q)}</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          ))}
+        </div>
+
+        {outputs.length > 1 && allPricesFilled && (
+          <div className="mt-2 flex justify-between font-mono text-[10px] text-white/40">
+            <span>Total revenue</span>
+            <span className="tabular-nums">{formatCurrency(totalRevenue)}</span>
+          </div>
+        )}
       </div>
-
-      <label className="mt-4 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Quantity</span>
-        <div
-          className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
-          style={{ background: "rgba(255,255,255,0.06)" }}
-        >
-          <input
-            type="text"
-            inputMode="decimal"
-            value={qty}
-            onChange={(e) => { setQty(e.target.value); setError(null); }}
-            placeholder="1"
-            className="w-full bg-transparent font-display text-lg text-white outline-none placeholder:text-white/20"
-          />
-        </div>
-      </label>
-
-      <label className="mt-4 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Total sell price</span>
-        <div
-          className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
-          style={{ background: "rgba(255,255,255,0.06)" }}
-        >
-          <span className="font-display text-lg text-white/50">$</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            autoFocus
-            value={price}
-            onChange={(e) => { setPrice(e.target.value); setError(null); }}
-            placeholder="0.00"
-            className="w-full bg-transparent font-display text-lg text-white outline-none placeholder:text-white/20"
-          />
-        </div>
-      </label>
 
       {/* Stashed inputs list */}
       {openEntries.length > 0 && (
@@ -467,7 +555,7 @@ function SellForm({
             Select what was consumed
             <span className="ml-2 text-white/25">(optional)</span>
           </div>
-          <div className="max-h-48 overflow-y-auto rounded-xl border border-white/10" style={{ background: "rgba(255,255,255,0.03)" }}>
+          <div className="max-h-44 overflow-y-auto rounded-xl border border-white/10" style={{ background: "rgba(255,255,255,0.03)" }}>
             {openEntries.map((entry, i) => {
               const checked = consumedIds.has(entry.id);
               return (
@@ -475,9 +563,8 @@ function SellForm({
                   key={entry.id}
                   type="button"
                   onClick={() => toggleConsumed(entry.id)}
-                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${i !== 0 ? "border-t border-white/5" : ""} ${checked ? "bg-white/5" : "hover:bg-white/4"}`}
+                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${i !== 0 ? "border-t border-white/5" : ""} ${checked ? "bg-white/5" : "hover:bg-white/[0.04]"}`}
                 >
-                  {/* Checkbox */}
                   <div
                     className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-all"
                     style={{
@@ -486,7 +573,7 @@ function SellForm({
                     }}
                   >
                     {checked && (
-                      <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 fill-white">
+                      <svg viewBox="0 0 10 8" className="h-2.5 w-2.5">
                         <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
@@ -510,14 +597,13 @@ function SellForm({
 
           {consumedIds.size > 0 && (
             <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/50">
-              <span>{consumedIds.size} item{consumedIds.size !== 1 ? "s" : ""} consumed · cost basis</span>
+              <span>{consumedIds.size} consumed · cost basis</span>
               <span className="tabular-nums">{formatCurrency(totalCost)}</span>
             </div>
           )}
         </div>
       )}
 
-      {/* P&L preview */}
       {previewPnl !== null && (
         <div
           className="mt-3 font-mono text-sm tabular-nums"

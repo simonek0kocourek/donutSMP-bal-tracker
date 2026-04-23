@@ -58,16 +58,25 @@ export function otherUser(user: UserId): UserId {
   return user === "s1xtus" ? "6PEKI9" : "s1xtus";
 }
 
+export type StashOutputItem = {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  sellPriceTotal: number; // sell price for this specific output
+};
+
 export type StashEntry = {
   id: string;
-  itemId: string;       // e.g. "netherite_ingot"
+  itemId: string;       // e.g. "netherite_ingot" (primary / display item)
   itemName: string;     // display name e.g. "Netherite Ingot"
   quantity: number;
   buyPriceTotal: number; // total USD paid
   buyTime: string;       // ISO string
-  sellPriceTotal?: number;
+  sellPriceTotal?: number; // sum of all outputItems sell prices (or direct sell price)
   sellTime?: string;
   note?: string;
+  // Multi-output sell: list of output items with individual prices
+  outputItems?: StashOutputItem[];
   // Crafting chain: IDs of stash entries consumed to produce this item
   consumedEntryIds?: string[];
   // Reverse link: if this entry was consumed as input for another sell
