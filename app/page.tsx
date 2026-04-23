@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import SignInButton from "@/components/SignInButton";
-import SilkBackground from "@/components/SilkBackground";
+import LiquidEtherBackground from "@/components/LiquidEtherBackground";
 import { useUser } from "@/hooks/useUser";
 import type { UserId } from "@/lib/types";
 
@@ -22,14 +22,13 @@ export default function SignInPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0f] px-4 py-10">
-      {/* Silk full-screen background */}
+      {/* LiquidEther full-screen background */}
       <div className="pointer-events-none absolute inset-0 z-0">
-        <SilkBackground
-          speed={5}
-          scale={1}
-          color="#6d28d9"
-          noiseIntensity={1.5}
-          rotation={0}
+        <LiquidEtherBackground
+          colors={["#6d28d9", "#374151", "#000000"]}
+          color0="#6d28d9"
+          color1="#374151"
+          color2="#000000"
         />
       </div>
 

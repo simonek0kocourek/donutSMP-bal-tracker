@@ -207,14 +207,6 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
           rotation={0}
         />
       </div>
-      {/* Per-user accent glow overlay */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 z-[1]"
-        style={{
-          background: `radial-gradient(ellipse 80% 50% at 50% -5%, ${theme.glow}, transparent 60%)`,
-        }}
-      />
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         <header
