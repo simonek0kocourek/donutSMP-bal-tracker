@@ -43,13 +43,13 @@ export default function DashboardPage() {
     );
   }
 
-  return <DashboardInner />;
+  return <DashboardInner user={user} />;
 }
 
-function DashboardInner() {
+function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   const router = useRouter();
-  const { user, signOut } = useUser();
-  const activeUser = user!;
+  const { signOut } = useUser();
+  const activeUser = user;
   const compareUser = otherUser(activeUser);
   const theme = USER_THEMES[activeUser];
 
