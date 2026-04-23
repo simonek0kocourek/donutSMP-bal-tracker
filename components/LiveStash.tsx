@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import type { StashEntry, UserId } from "@/lib/types";
 import { USER_THEMES } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { mcItemIconUrl } from "@/lib/mcItems";
+import ConfirmModal from "@/components/ConfirmModal";
 
 function formatDate(iso: string): string {
   try {
@@ -28,12 +30,14 @@ type Props = {
 
 export default function LiveStash({ user, stash, onSell, onDelete }: Props) {
   const theme = USER_THEMES[user];
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const open = stash
     .filter((e) => e.sellPriceTotal == null && e.consumedBySellId == null)
     .sort((a, b) => new Date(b.buyTime).getTime() - new Date(a.buyTime).getTime());
 
   const totalStashed = open.reduce((s, e) => s + e.buyPriceTotal, 0);
+  const pendingEntry = open.find((e) => e.id === pendingDelete);
 
   return (
     <div
@@ -113,7 +117,7 @@ export default function LiveStash({ user, stash, onSell, onDelete }: Props) {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onDelete(entry.id)}
+                  onClick={() => setPendingDelete(entry.id)}
                   className="rounded-lg border border-white/10 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-white/40 transition-colors hover:border-red-500/30 hover:text-red-400"
                   title="Remove"
                 >
@@ -150,6 +154,16 @@ export default function LiveStash({ user, stash, onSell, onDelete }: Props) {
           50% { opacity: 1; transform: scale(1.25); }
         }
       `}</style>
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Remove stashed item?"
+          message={pendingEntry ? `Remove ${pendingEntry.itemName} ×${pendingEntry.quantity} from your stash? This cannot be undone.` : "This cannot be undone."}
+          confirmLabel="Remove"
+          onConfirm={() => { onDelete(pendingDelete); setPendingDelete(null); }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

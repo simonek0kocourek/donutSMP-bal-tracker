@@ -5,6 +5,7 @@ import type { StashEntry, StashOutputItem, UserId } from "@/lib/types";
 import { USER_THEMES } from "@/lib/types";
 import { formatCurrency, formatSignedCurrency } from "@/lib/utils";
 import { mcItemIconUrl } from "@/lib/mcItems";
+import ConfirmModal from "@/components/ConfirmModal";
 
 function fmtDayMonth(iso: string): string {
   try {
@@ -67,6 +68,7 @@ type Props = {
 export default function PastTrades({ user, stash, onDelete }: Props) {
   const theme = USER_THEMES[user];
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ ids: string[]; label: string } | null>(null);
   const trades = buildTrades(stash);
   const maxAbsPnl = Math.max(...trades.map((t) => Math.abs(t.pnl)), 1);
 
@@ -183,7 +185,7 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
               {/* Delete */}
               <button
                 type="button"
-                onClick={() => onDelete([sell.id, ...inputs.map((i) => i.id)])}
+                onClick={() => setPendingDelete({ ids: [sell.id, ...inputs.map((i) => i.id)], label: sell.itemName })}
                 className="flex-shrink-0 rounded border border-red-500/20 bg-red-500/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-red-400/70 transition-colors hover:bg-red-500/20 hover:text-red-400"
               >
                 del
@@ -192,6 +194,16 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
           </div>
         );
       })}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Delete trade?"
+          message={`Delete the ${pendingDelete.label} trade and all its linked entries? This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => { onDelete(pendingDelete.ids); setPendingDelete(null); }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import SessionModal from "@/components/SessionModal";
 import SessionTable from "@/components/SessionTable";
 import StashModal from "@/components/StashModal";
 import StatCard from "@/components/StatCard";
+import ConfirmModal from "@/components/ConfirmModal";
 import { useActiveSession } from "@/hooks/useActiveSession";
 import { useSessions } from "@/hooks/useSessions";
 import { useStash } from "@/hooks/useStash";
@@ -586,48 +587,13 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
 
       {/* Reset confirmation modal */}
       {modal === "reset" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setModal(null)}
-        >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-          <div
-            className="relative w-full max-w-sm animate-scale-in rounded-2xl border border-white/10 bg-[#111118]/95 p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-red-400/70">
-              Destructive action
-            </div>
-            <h2 className="mt-1 font-display text-2xl text-white">
-              Reset today's stats?
-            </h2>
-            <p className="mt-2 font-mono text-xs leading-relaxed text-white/50">
-              This will delete all sessions logged today
-              {active.active ? " and clear the open session" : ""}. This cannot
-              be undone.
-            </p>
-            <div className="mt-6 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 font-mono text-xs uppercase tracking-[0.15em] text-white/70 transition-colors hover:bg-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleResetToday}
-                className="flex-1 rounded-lg px-4 py-2.5 font-mono text-xs uppercase tracking-[0.15em] text-white transition-all hover:-translate-y-0.5"
-                style={{
-                  background: "linear-gradient(135deg, #dc2626, #991b1b)",
-                  boxShadow: "0 4px 16px -4px rgba(220, 38, 38, 0.5)",
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal
+          title="Reset today's stats?"
+          message={`This will delete all sessions logged today${active.active ? " and clear the open session" : ""}. This cannot be undone.`}
+          confirmLabel="Reset"
+          onConfirm={handleResetToday}
+          onCancel={() => setModal(null)}
+        />
       )}
     </main>
   );
