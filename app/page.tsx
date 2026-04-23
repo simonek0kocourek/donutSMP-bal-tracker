@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import SignInButton from "@/components/SignInButton";
-import LiquidEtherBackground from "@/components/LiquidEtherBackground";
+import GridScanBackground from "@/components/GridScanBackground";
 import { useUser } from "@/hooks/useUser";
 import type { UserId } from "@/lib/types";
 
@@ -22,11 +22,8 @@ export default function SignInPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0f] px-4 py-10">
-      {/* LiquidEther full-screen background */}
-      <div className="absolute inset-0 z-0" style={{ width: "100%", height: "100%" }}>
-        <LiquidEtherBackground
-          colors={["#6608ffff", "#6c9ceaff", "#b9acacff"]}
-        />
+      <div className="absolute inset-0 z-0">
+        <GridScanBackground />
       </div>
 
       {/* Subtle vignette so card pops */}
