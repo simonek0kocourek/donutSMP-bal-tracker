@@ -25,7 +25,7 @@ export default function SignInPage() {
       {/* LiquidEther full-screen background */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <LiquidEtherBackground
-          colors={["#6d28d9", "#374151", "#000000"]}
+          colors={["#6608ffff", "#6c9ceaff", "#b9acacff"]}
         />
       </div>
 

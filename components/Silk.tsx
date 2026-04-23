@@ -1,54 +1,31 @@
-/* eslint-disable react/no-unknown-property */
-import React, { forwardRef, useMemo, useRef, useLayoutEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-// @ts-ignore
-import { Color, Mesh, ShaderMaterial } from 'three';
-import type { RootState } from '@react-three/fiber';
+"use client";
 
-type NormalizedRGB = [number, number, number];
+import { useEffect, useRef } from "react";
 
-const hexToNormalizedRGB = (hex: string): NormalizedRGB => {
-  const clean = hex.replace('#', '');
-  const r = parseInt(clean.slice(0, 2), 16) / 255;
-  const g = parseInt(clean.slice(2, 4), 16) / 255;
-  const b = parseInt(clean.slice(4, 6), 16) / 255;
-  return [r, g, b];
-};
-
-interface UniformValue<T = number | Color> {
-  value: T;
+export interface SilkProps {
+  speed?: number;
+  scale?: number;
+  color?: string;
+  noiseIntensity?: number;
+  rotation?: number;
 }
 
-interface SilkUniforms {
-  uSpeed: UniformValue<number>;
-  uScale: UniformValue<number>;
-  uNoiseIntensity: UniformValue<number>;
-  uColor: UniformValue<Color>;
-  uRotation: UniformValue<number>;
-  uTime: UniformValue<number>;
-}
-
-const vertexShader = `
-varying vec2 vUv;
-varying vec3 vPosition;
-
+const vertexSrc = `
+attribute vec2 a_position;
 void main() {
-  vPosition = position;
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  gl_Position = vec4(a_position, 0.0, 1.0);
 }
 `;
 
-const fragmentShader = `
-varying vec2 vUv;
-varying vec3 vPosition;
-
+const fragmentSrc = `
+precision mediump float;
 uniform float uTime;
 uniform vec3  uColor;
 uniform float uSpeed;
 uniform float uScale;
 uniform float uRotation;
 uniform float uNoiseIntensity;
+uniform vec2  uResolution;
 
 const float e = 2.71828182845904523536;
 
@@ -66,18 +43,19 @@ vec2 rotateUvs(vec2 uv, float angle) {
 }
 
 void main() {
-  float rnd        = noise(gl_FragCoord.xy);
-  vec2  uv         = rotateUvs(vUv * uScale, uRotation);
-  vec2  tex        = uv * uScale;
-  float tOffset    = uSpeed * uTime;
+  vec2 vUv = gl_FragCoord.xy / uResolution;
+  float rnd     = noise(gl_FragCoord.xy);
+  vec2  uv      = rotateUvs(vUv * uScale, uRotation);
+  vec2  tex     = uv * uScale;
+  float tOffset = uSpeed * uTime;
 
   tex.y += 0.03 * sin(8.0 * tex.x - tOffset);
 
   float pattern = 0.6 +
-                  0.4 * sin(5.0 * (tex.x + tex.y +
-                                   cos(3.0 * tex.x + 5.0 * tex.y) +
-                                   0.02 * tOffset) +
-                           sin(20.0 * (tex.x + tex.y - 0.1 * tOffset)));
+    0.4 * sin(5.0 * (tex.x + tex.y +
+      cos(3.0 * tex.x + 5.0 * tex.y) +
+      0.02 * tOffset) +
+      sin(20.0 * (tex.x + tex.y - 0.1 * tOffset)));
 
   vec4 col = vec4(uColor, 1.0) * vec4(pattern) - rnd / 15.0 * uNoiseIntensity;
   col.a = 1.0;
@@ -85,67 +63,103 @@ void main() {
 }
 `;
 
-interface SilkPlaneProps {
-  uniforms: SilkUniforms;
+function hexToRGB(hex: string): [number, number, number] {
+  const clean = hex.replace("#", "");
+  return [
+    parseInt(clean.slice(0, 2), 16) / 255,
+    parseInt(clean.slice(2, 4), 16) / 255,
+    parseInt(clean.slice(4, 6), 16) / 255,
+  ];
 }
 
-const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane({ uniforms }, ref) {
-  const { viewport } = useThree();
-
-  useLayoutEffect(() => {
-    const mesh = ref as React.MutableRefObject<Mesh | null>;
-    if (mesh.current) {
-      mesh.current.scale.set(viewport.width, viewport.height, 1);
-    }
-  }, [ref, viewport]);
-
-  useFrame((_state: RootState, delta: number) => {
-    const mesh = ref as React.MutableRefObject<Mesh | null>;
-    if (mesh.current) {
-      const material = mesh.current.material as ShaderMaterial & {
-        uniforms: SilkUniforms;
-      };
-      material.uniforms.uTime.value += 0.1 * delta;
-    }
-  });
-
-  return (
-    <mesh ref={ref}>
-      <planeGeometry args={[1, 1, 1, 1]} />
-      <shaderMaterial uniforms={uniforms} vertexShader={vertexShader} fragmentShader={fragmentShader} />
-    </mesh>
-  );
-});
-SilkPlane.displayName = 'SilkPlane';
-
-export interface SilkProps {
-  speed?: number;
-  scale?: number;
-  color?: string;
-  noiseIntensity?: number;
-  rotation?: number;
+function compileShader(gl: WebGLRenderingContext, type: number, src: string) {
+  const shader = gl.createShader(type)!;
+  gl.shaderSource(shader, src);
+  gl.compileShader(shader);
+  return shader;
 }
 
-const Silk: React.FC<SilkProps> = ({ speed = 5, scale = 1, color = '#7B7481', noiseIntensity = 1.5, rotation = 0 }) => {
-  const meshRef = useRef<Mesh>(null);
+export default function Silk({
+  speed = 5,
+  scale = 1,
+  color = "#7B7481",
+  noiseIntensity = 1.5,
+  rotation = 0,
+}: SilkProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const uniforms = useMemo<SilkUniforms>(
-    () => ({
-      uSpeed: { value: speed },
-      uScale: { value: scale },
-      uNoiseIntensity: { value: noiseIntensity },
-      uColor: { value: new Color(...hexToNormalizedRGB(color)) },
-      uRotation: { value: rotation },
-      uTime: { value: 0 }
-    }),
-    [speed, scale, noiseIntensity, color, rotation]
-  );
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const gl = canvas.getContext("webgl");
+    if (!gl) return;
+
+    const vert = compileShader(gl, gl.VERTEX_SHADER, vertexSrc);
+    const frag = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSrc);
+
+    const program = gl.createProgram()!;
+    gl.attachShader(program, vert!);
+    gl.attachShader(program, frag!);
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+    const aPosLoc = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(aPosLoc);
+    gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const uTime = gl.getUniformLocation(program, "uTime");
+    const uColor = gl.getUniformLocation(program, "uColor");
+    const uSpeed = gl.getUniformLocation(program, "uSpeed");
+    const uScale = gl.getUniformLocation(program, "uScale");
+    const uRotation = gl.getUniformLocation(program, "uRotation");
+    const uNoiseIntensity = gl.getUniformLocation(program, "uNoiseIntensity");
+    const uResolution = gl.getUniformLocation(program, "uResolution");
+
+    const rgb = hexToRGB(color);
+    gl.uniform3f(uColor, rgb[0], rgb[1], rgb[2]);
+    gl.uniform1f(uSpeed, speed * 0.001);
+    gl.uniform1f(uScale, scale);
+    gl.uniform1f(uRotation, rotation);
+    gl.uniform1f(uNoiseIntensity, noiseIntensity);
+
+    let t = 0;
+    let raf: number;
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth * devicePixelRatio;
+      canvas.height = canvas.offsetHeight * devicePixelRatio;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform2f(uResolution, canvas.width, canvas.height);
+    };
+
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    resize();
+
+    const draw = () => {
+      t += 1;
+      gl.uniform1f(uTime, t);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [speed, scale, color, noiseIntensity, rotation]);
 
   return (
-    <Canvas dpr={[1, 2]} frameloop="always">
-      <SilkPlane ref={meshRef} uniforms={uniforms} />
-    </Canvas>
+    <canvas
+      ref={canvasRef}
+      style={{ width: "100%", height: "100%", display: "block" }}
+    />
   );
-};
-
-export default Silk;
+}
