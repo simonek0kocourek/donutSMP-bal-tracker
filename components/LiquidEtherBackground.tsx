@@ -32,6 +32,9 @@ export default function LiquidEtherBackground({
         takeoverDuration={0.25}
         autoResumeDelay={3000}
         autoRampDuration={0.6}
+        color0={colors[0]}
+        color1={colors[1]}
+        color2={colors[2]}
       />
     </div>
   );
