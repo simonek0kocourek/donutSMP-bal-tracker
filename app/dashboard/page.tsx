@@ -56,6 +56,7 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   const primary = useSessions(activeUser);
   const secondary = useSessions(compareUser);
   const active = useActiveSession(activeUser);
+  const compareActive = useActiveSession(compareUser);
 
   const [modal, setModal] = useState<"start" | "end" | "reset" | null>(null);
   const [summary, setSummary] = useState<{
@@ -415,6 +416,10 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
             primaryActive={active.active}
             primaryLiveBalance={
               active.active ? active.active.startBalance : null
+            }
+            secondaryActive={compareActive.active}
+            secondaryLiveBalance={
+              compareActive.active ? compareActive.active.startBalance : null
             }
           />
         </section>

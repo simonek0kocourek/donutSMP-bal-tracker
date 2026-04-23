@@ -36,6 +36,8 @@ type Props = {
   secondarySessions: Session[];
   primaryActive: ActiveSession | null;
   primaryLiveBalance: number | null;
+  secondaryActive: ActiveSession | null;
+  secondaryLiveBalance: number | null;
 };
 
 function buildSeries(
@@ -72,6 +74,8 @@ export default function PortfolioChart({
   secondarySessions,
   primaryActive,
   primaryLiveBalance,
+  secondaryActive,
+  secondaryLiveBalance,
 }: Props) {
   const primaryTheme = USER_THEMES[primaryUser];
   const secondaryTheme = USER_THEMES[secondaryUser];
@@ -86,6 +90,14 @@ export default function PortfolioChart({
         new Date(primaryActive.startTime).getTime(),
       );
       primarySeries.push({ time: liveTime, value: primaryLiveBalance });
+    }
+
+    if (secondaryActive && secondaryLiveBalance != null) {
+      const liveTime = Math.max(
+        Date.now(),
+        new Date(secondaryActive.startTime).getTime(),
+      );
+      secondarySeries.push({ time: liveTime, value: secondaryLiveBalance });
     }
 
     const times = new Set<number>();
@@ -115,7 +127,7 @@ export default function PortfolioChart({
       });
     }
     return points;
-  }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance]);
+  }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance, secondaryActive, secondaryLiveBalance]);
 
   const yDomain = useMemo<[number, number]>(() => {
     const allValues: number[] = [];
