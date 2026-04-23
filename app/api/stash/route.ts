@@ -33,6 +33,9 @@ function validateEntry(raw: unknown): StashEntry | null {
   if (typeof e.sellPriceTotal === "number") entry.sellPriceTotal = e.sellPriceTotal;
   if (typeof e.sellTime === "string") entry.sellTime = e.sellTime;
   if (typeof e.note === "string") entry.note = e.note;
+  if (Array.isArray(e.consumedEntryIds)) entry.consumedEntryIds = e.consumedEntryIds as string[];
+  if (typeof e.consumedBySellId === "string") entry.consumedBySellId = e.consumedBySellId;
+  if (Array.isArray(e.outputItems)) entry.outputItems = e.outputItems as StashEntry["outputItems"];
   return entry;
 }
 
