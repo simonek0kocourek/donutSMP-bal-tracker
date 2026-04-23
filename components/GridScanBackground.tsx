@@ -17,7 +17,7 @@ type GridScanProps = {
 };
 
 const GridScan = dynamic(
-  () => import("./GridScan") as unknown as Promise<{ default: ComponentType<GridScanProps> }>,
+  () => import("./GridScan").then((mod) => ({ default: mod.GridScan })),
   {
     ssr: false,
     loading: () => <div style={{ position: "absolute", inset: 0, background: "#0a0a0f" }} />,
