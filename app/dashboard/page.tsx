@@ -7,11 +7,15 @@ import SilkBackground from "@/components/SilkBackground";
 import PortfolioChart from "@/components/PortfolioChart";
 import SessionModal from "@/components/SessionModal";
 import SessionTable from "@/components/SessionTable";
+import StashLeaderboard from "@/components/StashLeaderboard";
+import StashModal from "@/components/StashModal";
+import StashTable from "@/components/StashTable";
 import StatCard from "@/components/StatCard";
 import { useActiveSession } from "@/hooks/useActiveSession";
 import { useSessions } from "@/hooks/useSessions";
+import { useStash } from "@/hooks/useStash";
 import { useUser } from "@/hooks/useUser";
-import type { Session } from "@/lib/types";
+import type { Session, StashEntry } from "@/lib/types";
 import { USER_THEMES, otherUser } from "@/lib/types";
 import {
   annualizedReturn,
@@ -59,7 +63,12 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   const active = useActiveSession(activeUser);
   const compareActive = useActiveSession(compareUser);
 
+  const stashHook = useStash(activeUser);
+  const compareStash = useStash(compareUser);
+
   const [modal, setModal] = useState<"start" | "end" | "reset" | null>(null);
+  const [stashModal, setStashModal] = useState<"add" | null>(null);
+  const [sellEntry, setSellEntry] = useState<StashEntry | null>(null);
   const [summary, setSummary] = useState<{
     durationMinutes: number;
     earned: number;
@@ -101,9 +110,27 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
     [primary.sessions],
   );
 
-  const headlineBalance = active.active
+  const liquidBalance = active.active
     ? active.active.startBalance
     : latest?.endBalance ?? 0;
+
+  const totalOpenStash = useMemo(
+    () =>
+      stashHook.stash
+        .filter((e) => e.sellPriceTotal == null)
+        .reduce((sum, e) => sum + e.buyPriceTotal, 0),
+    [stashHook.stash],
+  );
+
+  const stashPnl = useMemo(
+    () =>
+      stashHook.stash
+        .filter((e) => e.sellPriceTotal != null)
+        .reduce((sum, e) => sum + (e.sellPriceTotal! - e.buyPriceTotal), 0),
+    [stashHook.stash],
+  );
+
+  const headlineBalance = liquidBalance + totalOpenStash;
 
   const annual = useMemo(() => {
     if (!first) return null;
@@ -427,6 +454,8 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
             secondaryLiveBalance={
               compareActive.active ? compareActive.active.startBalance : null
             }
+            primaryStash={stashHook.stash}
+            secondaryStash={compareStash.stash}
           />
         </section>
 
@@ -436,8 +465,8 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
         >
           <StatCard
             label="Total Earned"
-            value={formatSignedCurrency(totalEarned)}
-            tone={totalEarned >= 0 ? "positive" : "negative"}
+            value={formatSignedCurrency(totalEarned + stashPnl)}
+            tone={(totalEarned + stashPnl) >= 0 ? "positive" : "negative"}
             accentColor={theme.accent}
           />
           <StatCard
@@ -452,10 +481,10 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
             accentColor={theme.accent}
           />
           <StatCard
-            label="Best Session"
-            value={formatSignedCurrency(bestSession)}
-            tone={bestSession >= 0 ? "positive" : "negative"}
-            accentColor={theme.accent}
+            label="Stashed"
+            value={formatCurrency(totalOpenStash)}
+            tone={totalOpenStash > 0 ? "accent" : undefined}
+            accentColor="#fbbf24"
           />
         </section>
 
@@ -475,6 +504,57 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
             sessions={primary.sessions}
             onDelete={primary.removeSession}
           />
+        </section>
+
+        {/* Stash section */}
+        <section
+          className="fade-up mt-10"
+          style={{ animationDelay: "440ms" }}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="font-display text-lg text-white">Investments</h2>
+              {totalOpenStash > 0 && (
+                <span
+                  className="rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em]"
+                  style={{
+                    background: "rgba(251,191,36,0.15)",
+                    color: "#fbbf24",
+                    border: "1px solid rgba(251,191,36,0.25)",
+                  }}
+                >
+                  {formatCurrency(totalOpenStash)} stashed
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setStashModal("add")}
+              className="rounded-lg px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white transition-all hover:-translate-y-0.5"
+              style={{
+                background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.gradientTo})`,
+                boxShadow: `0 4px 14px -4px ${theme.glow}`,
+              }}
+            >
+              + Add investment
+            </button>
+          </div>
+          <StashTable
+            user={activeUser}
+            stash={stashHook.stash}
+            onSell={(entry) => setSellEntry(entry)}
+            onDelete={stashHook.removeEntry}
+          />
+
+          {/* Item profit leaderboard — only shown when there are closed trades */}
+          {stashHook.stash.some((e) => e.sellPriceTotal != null) && (
+            <div className="mt-6">
+              <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
+                Item leaderboard
+              </div>
+              <StashLeaderboard user={activeUser} stash={stashHook.stash} />
+            </div>
+          )}
         </section>
 
         <footer className="mt-10 pb-4 text-center font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
@@ -497,6 +577,31 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
           startBalance={active.active.startBalance}
           onClose={() => setModal(null)}
           onConfirm={handleEnd}
+        />
+      )}
+
+      {/* Stash modals */}
+      {stashModal === "add" && (
+        <StashModal
+          mode="add"
+          user={activeUser}
+          onClose={() => setStashModal(null)}
+          onConfirm={async (entry) => {
+            setStashModal(null);
+            await stashHook.addEntry(entry);
+          }}
+        />
+      )}
+      {sellEntry && (
+        <StashModal
+          mode="sell"
+          user={activeUser}
+          entry={sellEntry}
+          onClose={() => setSellEntry(null)}
+          onConfirm={async (entry) => {
+            setSellEntry(null);
+            await stashHook.updateEntry(entry);
+          }}
         />
       )}
 

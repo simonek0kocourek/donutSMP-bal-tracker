@@ -1,15 +1,18 @@
 import { Redis } from "@upstash/redis";
-import type { ActiveSession, Session, UserId } from "./types";
+import type { ActiveSession, Session, StashEntry, UserId } from "./types";
 
 export interface Store {
   getSessions(user: UserId): Promise<Session[]>;
   setSessions(user: UserId, sessions: Session[]): Promise<void>;
   getActive(user: UserId): Promise<ActiveSession | null>;
   setActive(user: UserId, active: ActiveSession | null): Promise<void>;
+  getStash(user: UserId): Promise<StashEntry[]>;
+  setStash(user: UserId, stash: StashEntry[]): Promise<void>;
 }
 
 const sessionsKey = (user: UserId) => `donut:sessions:${user}`;
 const activeKey = (user: UserId) => `donut:active:${user}`;
+const stashKey = (user: UserId) => `donut:stash:${user}`;
 
 function parseMaybe<T>(raw: unknown): T | null {
   if (raw == null) return null;
@@ -53,12 +56,21 @@ function createRedisStore(redis: Redis): Store {
         await redis.set(activeKey(user), JSON.stringify(active));
       }
     },
+    async getStash(user) {
+      const raw = await redis.get(stashKey(user));
+      const parsed = parseMaybe<StashEntry[]>(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    },
+    async setStash(user, stash) {
+      await redis.set(stashKey(user), JSON.stringify(stash));
+    },
   };
 }
 
 type MemoryDB = {
   sessions: Map<UserId, Session[]>;
   active: Map<UserId, ActiveSession | null>;
+  stash: Map<UserId, StashEntry[]>;
 };
 
 const MEMORY_KEY = "__donut_memory_db__";
@@ -69,6 +81,7 @@ function getMemoryDB(): MemoryDB {
     g[MEMORY_KEY] = {
       sessions: new Map(),
       active: new Map(),
+      stash: new Map(),
     };
   }
   return g[MEMORY_KEY]!;
@@ -92,6 +105,14 @@ function createMemoryStore(): Store {
       const db = getMemoryDB();
       if (active === null) db.active.delete(user);
       else db.active.set(user, active);
+    },
+    async getStash(user) {
+      const db = getMemoryDB();
+      return db.stash.get(user) ?? [];
+    },
+    async setStash(user, stash) {
+      const db = getMemoryDB();
+      db.stash.set(user, stash);
     },
   };
 }

@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ActiveSession, Session, UserId } from "@/lib/types";
+import type { ActiveSession, Session, StashEntry, UserId } from "@/lib/types";
 import { USER_THEMES } from "@/lib/types";
 import {
   formatCurrency,
@@ -27,6 +27,7 @@ type ChartPoint = {
   secondary?: number;
   primaryEarned?: number;
   primaryHourlyRate?: number;
+  primaryStashed?: number;
 };
 
 type Props = {
@@ -38,24 +39,18 @@ type Props = {
   primaryLiveBalance: number | null;
   secondaryActive: ActiveSession | null;
   secondaryLiveBalance: number | null;
+  primaryStash?: StashEntry[];
+  secondaryStash?: StashEntry[];
 };
 
 function buildSeries(
   sessions: Session[],
 ): { time: number; value: number; earned?: number; hourly?: number }[] {
   const sorted = sortSessionsAsc(sessions);
-  const points: {
-    time: number;
-    value: number;
-    earned?: number;
-    hourly?: number;
-  }[] = [];
+  const points: { time: number; value: number; earned?: number; hourly?: number }[] = [];
   if (sorted.length === 0) return points;
   const first = sorted[0]!;
-  points.push({
-    time: new Date(first.startTime).getTime(),
-    value: first.startBalance,
-  });
+  points.push({ time: new Date(first.startTime).getTime(), value: first.startBalance });
   for (const s of sorted) {
     points.push({
       time: new Date(s.endTime).getTime(),
@@ -67,6 +62,17 @@ function buildSeries(
   return points;
 }
 
+// Returns total open stash value (at buy price) at a given timestamp.
+// Positions bought BEFORE or AT `atTime` and not yet sold (or sold AFTER `atTime`) count.
+function openStashAt(stash: StashEntry[], atTime: number): number {
+  return stash.reduce((sum, e) => {
+    const buyT = new Date(e.buyTime).getTime();
+    const sellT = e.sellTime ? new Date(e.sellTime).getTime() : Infinity;
+    if (buyT <= atTime && sellT > atTime) return sum + e.buyPriceTotal;
+    return sum;
+  }, 0);
+}
+
 export default function PortfolioChart({
   primaryUser,
   secondaryUser,
@@ -76,6 +82,8 @@ export default function PortfolioChart({
   primaryLiveBalance,
   secondaryActive,
   secondaryLiveBalance,
+  primaryStash = [],
+  secondaryStash = [],
 }: Props) {
   const primaryTheme = USER_THEMES[primaryUser];
   const secondaryTheme = USER_THEMES[secondaryUser];
@@ -85,24 +93,25 @@ export default function PortfolioChart({
     const secondarySeries = buildSeries(secondarySessions);
 
     if (primaryActive && primaryLiveBalance != null) {
-      const liveTime = Math.max(
-        Date.now(),
-        new Date(primaryActive.startTime).getTime(),
-      );
+      const liveTime = Math.max(Date.now(), new Date(primaryActive.startTime).getTime());
       primarySeries.push({ time: liveTime, value: primaryLiveBalance });
     }
-
     if (secondaryActive && secondaryLiveBalance != null) {
-      const liveTime = Math.max(
-        Date.now(),
-        new Date(secondaryActive.startTime).getTime(),
-      );
+      const liveTime = Math.max(Date.now(), new Date(secondaryActive.startTime).getTime());
       secondarySeries.push({ time: liveTime, value: secondaryLiveBalance });
     }
+
+    // Also include stash buy/sell times as chart points so transitions are exact
+    const stashTimes = [
+      ...primaryStash.map((e) => new Date(e.buyTime).getTime()),
+      ...primaryStash.filter((e) => e.sellTime).map((e) => new Date(e.sellTime!).getTime()),
+    ];
 
     const times = new Set<number>();
     primarySeries.forEach((p) => times.add(p.time));
     secondarySeries.forEach((p) => times.add(p.time));
+    stashTimes.forEach((t) => times.add(t));
+
     const sortedTimes = [...times].sort((a, b) => a - b);
 
     const primaryMap = new Map<number, (typeof primarySeries)[number]>();
@@ -113,21 +122,27 @@ export default function PortfolioChart({
     let lastPrimary: number | undefined;
     let lastSecondary: number | undefined;
     const points: ChartPoint[] = [];
+
     for (const t of sortedTimes) {
       const pIn = primaryMap.get(t);
       const sIn = secondaryMap.get(t);
       if (pIn) lastPrimary = pIn.value;
       if (sIn) lastSecondary = sIn.value;
+
+      const stashedPrimary = openStashAt(primaryStash, t);
+      const liquidPrimary = lastPrimary ?? 0;
+
       points.push({
         time: t,
-        primary: lastPrimary,
+        primary: lastPrimary != null ? liquidPrimary + stashedPrimary : undefined,
         secondary: lastSecondary,
         primaryEarned: pIn?.earned,
         primaryHourlyRate: pIn?.hourly,
+        primaryStashed: stashedPrimary > 0 ? stashedPrimary : undefined,
       });
     }
     return points;
-  }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance, secondaryActive, secondaryLiveBalance]);
+  }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance, secondaryActive, secondaryLiveBalance, primaryStash, secondaryStash]);
 
   const yDomain = useMemo<[number, number]>(() => {
     const allValues: number[] = [];
@@ -181,42 +196,30 @@ export default function PortfolioChart({
   return (
     <div className="relative rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-6">
       <div className="pointer-events-none absolute left-6 top-6 z-10 flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.18em] text-white/60">
+        <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.25em] text-white/40">
+          Net Worth
+        </div>
+      </div>
+      <div className="pointer-events-none absolute right-6 top-6 z-10 flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.18em] text-white/60">
         <div className="flex items-center gap-2">
           <span
             className="inline-block h-2 w-2 rounded-full"
-            style={{
-              background: primaryTheme.line,
-              boxShadow: `0 0 8px ${primaryTheme.line}`,
-            }}
+            style={{ background: primaryTheme.line, boxShadow: `0 0 8px ${primaryTheme.line}` }}
           />
           {primaryUser}
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ background: secondaryTheme.line }}
-          />
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: secondaryTheme.line }} />
           {secondaryUser}
         </div>
       </div>
-      <div className="h-[320px] w-full sm:h-[400px]">
+      <div className="h-[320px] w-full pt-6 sm:h-[400px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={data}
-            margin={{ top: 36, right: 8, left: 0, bottom: 0 }}
-          >
+          <ComposedChart data={data} margin={{ top: 36, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="0%"
-                  stopColor={primaryTheme.line}
-                  stopOpacity={0.28}
-                />
-                <stop
-                  offset="100%"
-                  stopColor={primaryTheme.line}
-                  stopOpacity={0}
-                />
+                <stop offset="0%" stopColor={primaryTheme.line} stopOpacity={0.28} />
+                <stop offset="100%" stopColor={primaryTheme.line} stopOpacity={0} />
               </linearGradient>
               <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="3" result="blur" />
@@ -226,10 +229,7 @@ export default function PortfolioChart({
                 </feMerge>
               </filter>
             </defs>
-            <CartesianGrid
-              stroke="rgba(255,255,255,0.05)"
-              vertical={false}
-            />
+            <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis
               dataKey="time"
               type="number"
@@ -237,15 +237,9 @@ export default function PortfolioChart({
               domain={["dataMin", "dataMax"]}
               ticks={monthTicks.length ? monthTicks : undefined}
               tickFormatter={(t) =>
-                new Intl.DateTimeFormat("en-US", {
-                  month: "short",
-                }).format(new Date(t as number))
+                new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(t as number))
               }
-              tick={{
-                fill: "rgba(255,255,255,0.4)",
-                fontSize: 10,
-                fontFamily: "var(--font-mono)",
-              }}
+              tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10, fontFamily: "var(--font-mono)" }}
               axisLine={false}
               tickLine={false}
               minTickGap={24}
@@ -253,11 +247,7 @@ export default function PortfolioChart({
             <YAxis
               orientation="right"
               tickFormatter={(v) => formatCurrencyCompact(v as number)}
-              tick={{
-                fill: "rgba(255,255,255,0.4)",
-                fontSize: 10,
-                fontFamily: "var(--font-mono)",
-              }}
+              tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10, fontFamily: "var(--font-mono)" }}
               axisLine={false}
               tickLine={false}
               width={72}
@@ -266,10 +256,7 @@ export default function PortfolioChart({
             <Tooltip
               cursor={{ stroke: "rgba(255,255,255,0.2)", strokeDasharray: "3 3" }}
               content={(p: unknown) => {
-                const props = p as {
-                  active?: boolean;
-                  payload?: { payload: ChartPoint }[];
-                };
+                const props = p as { active?: boolean; payload?: { payload: ChartPoint }[] };
                 if (!props.active || !props.payload?.length) return null;
                 const point = props.payload[0]!.payload;
                 return (
@@ -278,52 +265,35 @@ export default function PortfolioChart({
                       {formatDateShort(new Date(point.time).toISOString())}
                     </div>
                     {point.primary != null && (
-                      <div
-                        className="mt-1.5 flex items-center justify-between gap-4"
-                        style={{ color: primaryTheme.line }}
-                      >
-                        <span className="uppercase tracking-wide">
-                          {primaryUser}
-                        </span>
-                        <span className="font-display text-sm">
-                          {formatCurrency(point.primary)}
-                        </span>
+                      <div className="mt-1.5 flex items-center justify-between gap-4" style={{ color: primaryTheme.line }}>
+                        <span className="uppercase tracking-wide">{primaryUser}</span>
+                        <span className="font-display text-sm">{formatCurrency(point.primary)}</span>
+                      </div>
+                    )}
+                    {point.primaryStashed != null && (
+                      <div className="flex items-center justify-between gap-4 text-amber-400/80">
+                        <span className="uppercase tracking-wide">Stashed</span>
+                        <span className="font-display text-sm">{formatCurrency(point.primaryStashed)}</span>
                       </div>
                     )}
                     {point.secondary != null && (
-                      <div
-                        className="flex items-center justify-between gap-4"
-                        style={{ color: secondaryTheme.line }}
-                      >
-                        <span className="uppercase tracking-wide">
-                          {secondaryUser}
-                        </span>
-                        <span className="font-display text-sm">
-                          {formatCurrency(point.secondary)}
-                        </span>
+                      <div className="flex items-center justify-between gap-4" style={{ color: secondaryTheme.line }}>
+                        <span className="uppercase tracking-wide">{secondaryUser}</span>
+                        <span className="font-display text-sm">{formatCurrency(point.secondary)}</span>
                       </div>
                     )}
                     {point.primaryEarned != null && (
                       <div className="mt-2 border-t border-white/10 pt-1.5 text-[10px] text-white/60">
                         <div className="flex justify-between gap-4">
                           <span>Earned</span>
-                          <span
-                            style={{
-                              color:
-                                point.primaryEarned >= 0
-                                  ? "#4ade80"
-                                  : "#f87171",
-                            }}
-                          >
+                          <span style={{ color: point.primaryEarned >= 0 ? "#4ade80" : "#f87171" }}>
                             {formatSignedCurrency(point.primaryEarned)}
                           </span>
                         </div>
                         {point.primaryHourlyRate != null && (
                           <div className="flex justify-between gap-4">
                             <span>$/hr</span>
-                            <span style={{ color: primaryTheme.line }}>
-                              {formatCurrency(point.primaryHourlyRate)}
-                            </span>
+                            <span style={{ color: primaryTheme.line }}>{formatCurrency(point.primaryHourlyRate)}</span>
                           </div>
                         )}
                       </div>
@@ -359,12 +329,7 @@ export default function PortfolioChart({
               stroke={primaryTheme.line}
               strokeWidth={2.5}
               dot={false}
-              activeDot={{
-                r: 5,
-                fill: primaryTheme.line,
-                stroke: "#fff",
-                strokeWidth: 1,
-              }}
+              activeDot={{ r: 5, fill: primaryTheme.line, stroke: "#fff", strokeWidth: 1 }}
               filter={`url(#${glowId})`}
               isAnimationActive
               animationDuration={900}

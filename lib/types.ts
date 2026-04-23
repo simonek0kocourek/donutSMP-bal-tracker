@@ -57,3 +57,15 @@ export const USER_THEMES: Record<UserId, UserTheme> = {
 export function otherUser(user: UserId): UserId {
   return user === "s1xtus" ? "6PEKI9" : "s1xtus";
 }
+
+export type StashEntry = {
+  id: string;
+  itemId: string;       // e.g. "netherite_ingot"
+  itemName: string;     // display name e.g. "Netherite Ingot"
+  quantity: number;
+  buyPriceTotal: number; // total USD paid
+  buyTime: string;       // ISO string
+  sellPriceTotal?: number;
+  sellTime?: string;
+  note?: string;
+};
