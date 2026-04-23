@@ -68,4 +68,8 @@ export type StashEntry = {
   sellPriceTotal?: number;
   sellTime?: string;
   note?: string;
+  // Crafting chain: IDs of stash entries consumed to produce this item
+  consumedEntryIds?: string[];
+  // Reverse link: if this entry was consumed as input for another sell
+  consumedBySellId?: string;
 };

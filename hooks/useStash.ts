@@ -99,6 +99,30 @@ export function useStash(user: UserId | null) {
     }
   }, [fetchNow]);
 
+  const updateEntries = useCallback(async (entries: StashEntry[]) => {
+    const u = userRef.current;
+    if (!u) return;
+    setStash((prev) => {
+      const map = new Map(prev.map((e) => [e.id, e]));
+      for (const e of entries) map.set(e.id, e);
+      return [...map.values()];
+    });
+    try {
+      for (const entry of entries) {
+        const res = await fetch("/api/stash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: u, entry }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }
+      fetchNow();
+    } catch (e) {
+      setError((e as Error).message || "Batch update failed");
+      fetchNow();
+    }
+  }, [fetchNow]);
+
   const removeEntry = useCallback(async (id: string) => {
     const u = userRef.current;
     if (!u) return;
@@ -117,5 +141,5 @@ export function useStash(user: UserId | null) {
     }
   }, [fetchNow]);
 
-  return { stash, ready, error, addEntry, updateEntry, removeEntry, refetch: fetchNow };
+  return { stash, ready, error, addEntry, updateEntry, updateEntries, removeEntry, refetch: fetchNow };
 }

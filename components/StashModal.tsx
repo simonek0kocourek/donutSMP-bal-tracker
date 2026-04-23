@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { StashEntry, UserTheme, UserId } from "@/lib/types";
 import { USER_THEMES } from "@/lib/types";
-import { formatCurrency, parseDecimalInput } from "@/lib/utils";
+import { formatCurrency, formatSignedCurrency, parseDecimalInput } from "@/lib/utils";
 import { mcItemIconUrl, searchMcItems, type McItem } from "@/lib/mcItems";
 
 function newId(): string {
@@ -39,9 +39,11 @@ type AddProps = {
 type SellProps = {
   mode: "sell";
   user: UserId;
-  entry: StashEntry;
+  // All currently open stash entries (to pick consumed inputs from)
+  openEntries: StashEntry[];
   onClose: () => void;
-  onConfirm: (entry: StashEntry) => void;
+  // Returns the new sell entry + all consumed entries (marked closed)
+  onConfirm: (sellEntry: StashEntry, consumed: StashEntry[]) => void;
 };
 
 type Props = AddProps | SellProps;
@@ -50,20 +52,17 @@ export default function StashModal(props: Props) {
   const theme = USER_THEMES[props.user];
   const [visible, setVisible] = useState(false);
 
-  // Fade in on mount
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(id);
   }, []);
 
-  // Lock page scroll
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  // Animate out then call real onClose
   const close = () => {
     setVisible(false);
     setTimeout(props.onClose, 220);
@@ -85,10 +84,7 @@ export default function StashModal(props: Props) {
         opacity: visible ? 1 : 0,
       }}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
-
-      {/* Sheet */}
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-sm rounded-t-2xl border border-white/15 sm:rounded-2xl"
@@ -114,30 +110,22 @@ export default function StashModal(props: Props) {
   );
 }
 
-// ─── Add form ────────────────────────────────────────────────────────────────
+// ─── Item search widget ───────────────────────────────────────────────────────
 
-function AddForm({
-  onClose,
-  onConfirm,
-  theme,
-}: AddProps & { theme: UserTheme }) {
-  const [query, setQuery] = useState("");
+function ItemSearch({
+  value,
+  onChange,
+  placeholder = "Search items…",
+}: {
+  value: McItem | null;
+  onChange: (item: McItem | null) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState(value?.name ?? "");
   const [results, setResults] = useState<McItem[]>(searchMcItems(""));
-  const [selected, setSelected] = useState<McItem | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [qty, setQty] = useState("1");
-  const [price, setPrice] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => new Date().toISOString());
-
-  // Dropdown positioning — rendered inline with overflow visible on the wrapper
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date().toISOString()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
 
   useEffect(() => {
     setResults(searchMcItems(query));
@@ -155,11 +143,102 @@ function AddForm({
   }, []);
 
   const handleSelect = (item: McItem) => {
-    setSelected(item);
+    onChange(item);
     setQuery(item.name);
     setShowDropdown(false);
     inputRef.current?.blur();
   };
+
+  return (
+    <div ref={searchRef} className="relative">
+      <div
+        className="flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
+        style={{ background: "rgba(255,255,255,0.06)" }}
+      >
+        {value && (
+          <img
+            src={mcItemIconUrl(value.id)}
+            alt={value.name}
+            className="h-6 w-6 flex-shrink-0 [image-rendering:pixelated]"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); onChange(null); }}
+          onFocus={() => setShowDropdown(true)}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="w-full bg-transparent font-mono text-sm text-white outline-none placeholder:text-white/25"
+        />
+        {query.length > 0 && (
+          <button
+            type="button"
+            onMouseDown={() => { setQuery(""); onChange(null); setShowDropdown(false); }}
+            className="flex-shrink-0 font-mono text-xs text-white/30 hover:text-white/60"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {showDropdown && results.length > 0 && (
+        <div
+          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-xl border border-white/15 shadow-2xl"
+          style={{
+            background: "rgba(8,8,16,0.97)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+          }}
+        >
+          {results.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onMouseDown={() => handleSelect(item)}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/8"
+            >
+              <img
+                src={mcItemIconUrl(item.id)}
+                alt={item.name}
+                className="h-6 w-6 flex-shrink-0 [image-rendering:pixelated]"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+              <div>
+                <div className="font-mono text-xs text-white">{item.name}</div>
+                <div className="font-mono text-[10px] text-white/35">{item.category}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showDropdown && results.length > 0 && (
+        <div style={{ height: Math.min(results.length * 44, 208) + 8 }} />
+      )}
+    </div>
+  );
+}
+
+// ─── Add form ────────────────────────────────────────────────────────────────
+
+function AddForm({
+  onClose,
+  onConfirm,
+  theme,
+}: AddProps & { theme: UserTheme }) {
+  const [selected, setSelected] = useState<McItem | null>(null);
+  const [qty, setQty] = useState("1");
+  const [price, setPrice] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date().toISOString());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date().toISOString()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,95 +260,18 @@ function AddForm({
 
   return (
     <form onSubmit={handleSubmit} className="p-6">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
-        Stash
-      </div>
-      <h2 className="mt-1 font-display text-2xl text-white">Log investment</h2>
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Stash</div>
+      <h2 className="mt-1 font-display text-2xl text-white">Buy to stash</h2>
 
-      {/* Item search — dropdown is inline, stacks below and pushes content down intentionally inside the scrollable sheet */}
-      <div className="mt-5" ref={searchRef}>
-        <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
-          Item
-        </label>
-        <div className="relative mt-2">
-          {/* Input row */}
-          <div
-            className="flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
-            style={{ background: "rgba(255,255,255,0.06)" }}
-          >
-            {selected && (
-              <img
-                src={mcItemIconUrl(selected.id)}
-                alt={selected.name}
-                className="h-6 w-6 flex-shrink-0 [image-rendering:pixelated]"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-            )}
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); setSelected(null); setError(null); }}
-              onFocus={() => setShowDropdown(true)}
-              placeholder="Search items…"
-              autoComplete="off"
-              className="w-full bg-transparent font-mono text-sm text-white outline-none placeholder:text-white/25"
-            />
-            {query.length > 0 && (
-              <button
-                type="button"
-                onMouseDown={() => { setQuery(""); setSelected(null); setShowDropdown(false); }}
-                className="flex-shrink-0 font-mono text-xs text-white/30 hover:text-white/60"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Dropdown — absolutely positioned, overlaps content below */}
-          {showDropdown && results.length > 0 && (
-            <div
-              className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-xl border border-white/15 shadow-2xl"
-              style={{
-                background: "rgba(8,8,16,0.97)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-              }}
-            >
-              {results.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onMouseDown={() => handleSelect(item)}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/8"
-                >
-                  <img
-                    src={mcItemIconUrl(item.id)}
-                    alt={item.name}
-                    className="h-6 w-6 flex-shrink-0 [image-rendering:pixelated]"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                  <div>
-                    <div className="font-mono text-xs text-white">{item.name}</div>
-                    <div className="font-mono text-[10px] text-white/35">{item.category}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+      <div className="mt-5">
+        <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Item</label>
+        <div className="mt-2">
+          <ItemSearch value={selected} onChange={(item) => { setSelected(item); setError(null); }} />
         </div>
       </div>
 
-      {/* Spacer that expands when dropdown is open so fields below stay visible */}
-      {showDropdown && results.length > 0 && (
-        <div style={{ height: Math.min(results.length * 44, 208) + 8 }} />
-      )}
-
-      {/* Quantity */}
       <label className="mt-4 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
-          Quantity
-        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Quantity</span>
         <div
           className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
           style={{ background: "rgba(255,255,255,0.06)" }}
@@ -285,11 +287,8 @@ function AddForm({
         </div>
       </label>
 
-      {/* Price */}
       <label className="mt-4 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
-          Total buy price
-        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Total buy price</span>
         <div
           className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
           style={{ background: "rgba(255,255,255,0.06)" }}
@@ -306,7 +305,6 @@ function AddForm({
         </div>
       </label>
 
-      {/* Live timestamp */}
       <div className="mt-3 font-mono text-[10px] text-white/35">
         <span className="uppercase tracking-[0.15em]">Timestamp </span>
         <span className="tabular-nums">{formatExactTime(now)}</span>
@@ -341,12 +339,15 @@ function AddForm({
 // ─── Sell form ────────────────────────────────────────────────────────────────
 
 function SellForm({
-  entry,
+  openEntries,
   onClose,
   onConfirm,
   theme,
 }: SellProps & { theme: UserTheme }) {
+  const [selectedItem, setSelectedItem] = useState<McItem | null>(null);
+  const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
+  const [consumedIds, setConsumedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().toISOString());
 
@@ -355,47 +356,93 @@ function SellForm({
     return () => window.clearInterval(id);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsedPrice = parseDecimalInput(price);
-    if (parsedPrice === null || parsedPrice < 0) { setError("Enter a valid sell price"); return; }
-    onConfirm({ ...entry, sellPriceTotal: parsedPrice, sellTime: new Date().toISOString() });
+  const totalCost = openEntries
+    .filter((e) => consumedIds.has(e.id))
+    .reduce((sum, e) => sum + e.buyPriceTotal, 0);
+
+  const parsedPrice = parseDecimalInput(price);
+  const previewPnl = parsedPrice !== null ? parsedPrice - totalCost : null;
+
+  const toggleConsumed = (id: string) => {
+    setConsumedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
-  const previewPnl =
-    price !== "" ? (parseDecimalInput(price) ?? 0) - entry.buyPriceTotal : null;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedItem) { setError("Pick the item you're selling"); return; }
+    const parsedQty = parseDecimalInput(qty);
+    if (!parsedQty || parsedQty <= 0) { setError("Enter a valid quantity"); return; }
+    if (parsedPrice === null || parsedPrice < 0) { setError("Enter a valid sell price"); return; }
+
+    const now = new Date().toISOString();
+    const sellId = newId();
+
+    const consumed = openEntries.filter((e) => consumedIds.has(e.id));
+
+    const sellEntry: StashEntry = {
+      id: sellId,
+      itemId: selectedItem.id,
+      itemName: selectedItem.name,
+      quantity: parsedQty,
+      buyPriceTotal: totalCost,
+      buyTime: now,
+      sellPriceTotal: parsedPrice,
+      sellTime: now,
+      consumedEntryIds: consumed.map((e) => e.id),
+    };
+
+    const closedInputs: StashEntry[] = consumed.map((e) => ({
+      ...e,
+      sellPriceTotal: 0,
+      sellTime: now,
+      consumedBySellId: sellId,
+    }));
+
+    onConfirm(sellEntry, closedInputs);
+  };
 
   return (
     <form onSubmit={handleSubmit} className="p-6">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
-        Stash — Sell
-      </div>
-      <h2 className="mt-1 font-display text-2xl text-white">Close position</h2>
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Stash</div>
+      <h2 className="mt-1 font-display text-2xl text-white">Sell stashed</h2>
 
-      {/* Item preview */}
-      <div
-        className="mt-4 flex items-center gap-3 rounded-xl border border-white/15 px-4 py-3"
-        style={{ background: "rgba(255,255,255,0.05)" }}
-      >
-        <img
-          src={mcItemIconUrl(entry.itemId)}
-          alt={entry.itemName}
-          className="h-8 w-8 [image-rendering:pixelated]"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-        />
-        <div>
-          <div className="font-display text-base text-white">{entry.itemName}</div>
-          <div className="font-mono text-[10px] text-white/40">
-            Qty {entry.quantity} · Bought for {formatCurrency(entry.buyPriceTotal)}
-          </div>
+      {/* What are you selling */}
+      <div className="mt-5">
+        <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
+          Item you&apos;re selling
+        </label>
+        <div className="mt-2">
+          <ItemSearch
+            value={selectedItem}
+            onChange={(item) => { setSelectedItem(item); setError(null); }}
+            placeholder="Search items…"
+          />
         </div>
       </div>
 
-      {/* Sell price */}
-      <label className="mt-5 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
-          Total sell price
-        </span>
+      <label className="mt-4 block">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Quantity</span>
+        <div
+          className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
+          style={{ background: "rgba(255,255,255,0.06)" }}
+        >
+          <input
+            type="text"
+            inputMode="decimal"
+            value={qty}
+            onChange={(e) => { setQty(e.target.value); setError(null); }}
+            placeholder="1"
+            className="w-full bg-transparent font-display text-lg text-white outline-none placeholder:text-white/20"
+          />
+        </div>
+      </label>
+
+      <label className="mt-4 block">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Total sell price</span>
         <div
           className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
           style={{ background: "rgba(255,255,255,0.06)" }}
@@ -413,13 +460,70 @@ function SellForm({
         </div>
       </label>
 
+      {/* Stashed inputs list */}
+      {openEntries.length > 0 && (
+        <div className="mt-5">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
+            Select what was consumed
+            <span className="ml-2 text-white/25">(optional)</span>
+          </div>
+          <div className="max-h-48 overflow-y-auto rounded-xl border border-white/10" style={{ background: "rgba(255,255,255,0.03)" }}>
+            {openEntries.map((entry, i) => {
+              const checked = consumedIds.has(entry.id);
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() => toggleConsumed(entry.id)}
+                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${i !== 0 ? "border-t border-white/5" : ""} ${checked ? "bg-white/5" : "hover:bg-white/4"}`}
+                >
+                  {/* Checkbox */}
+                  <div
+                    className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-all"
+                    style={{
+                      borderColor: checked ? theme.line : "rgba(255,255,255,0.2)",
+                      background: checked ? theme.gradientFrom : "transparent",
+                    }}
+                  >
+                    {checked && (
+                      <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 fill-white">
+                        <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <img
+                    src={mcItemIconUrl(entry.itemId)}
+                    alt={entry.itemName}
+                    className="h-6 w-6 flex-shrink-0 [image-rendering:pixelated]"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-xs text-white">{entry.itemName}</div>
+                    <div className="font-mono text-[10px] text-white/35">
+                      ×{entry.quantity} · {formatCurrency(entry.buyPriceTotal)}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {consumedIds.size > 0 && (
+            <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/50">
+              <span>{consumedIds.size} item{consumedIds.size !== 1 ? "s" : ""} consumed · cost basis</span>
+              <span className="tabular-nums">{formatCurrency(totalCost)}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* P&L preview */}
       {previewPnl !== null && (
         <div
           className="mt-3 font-mono text-sm tabular-nums"
           style={{ color: previewPnl >= 0 ? "#4ade80" : "#f87171" }}
         >
-          {previewPnl >= 0 ? "+" : ""}
-          {formatCurrency(previewPnl)} P&amp;L
+          {formatSignedCurrency(previewPnl)} P&amp;L
         </div>
       )}
 
@@ -453,7 +557,7 @@ function SellForm({
                 : `0 4px 16px -4px ${theme.glow}`,
           }}
         >
-          Sell
+          Confirm sell
         </button>
       </div>
     </form>

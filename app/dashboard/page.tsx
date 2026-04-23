@@ -5,17 +5,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import CountUp from "@/components/CountUp";
 import SilkBackground from "@/components/SilkBackground";
 import PortfolioChart from "@/components/PortfolioChart";
+import LiveStash from "@/components/LiveStash";
+import PastTrades from "@/components/PastTrades";
 import SessionModal from "@/components/SessionModal";
 import SessionTable from "@/components/SessionTable";
-import StashLeaderboard from "@/components/StashLeaderboard";
 import StashModal from "@/components/StashModal";
-import StashTable from "@/components/StashTable";
 import StatCard from "@/components/StatCard";
 import { useActiveSession } from "@/hooks/useActiveSession";
 import { useSessions } from "@/hooks/useSessions";
 import { useStash } from "@/hooks/useStash";
 import { useUser } from "@/hooks/useUser";
-import type { Session, StashEntry } from "@/lib/types";
+import type { Session } from "@/lib/types";
 import { USER_THEMES, otherUser } from "@/lib/types";
 import {
   annualizedReturn,
@@ -67,8 +67,7 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   const compareStash = useStash(compareUser);
 
   const [modal, setModal] = useState<"start" | "end" | "reset" | null>(null);
-  const [stashModal, setStashModal] = useState<"add" | null>(null);
-  const [sellEntry, setSellEntry] = useState<StashEntry | null>(null);
+  const [stashModal, setStashModal] = useState<"add" | "sell" | null>(null);
   const [summary, setSummary] = useState<{
     durationMinutes: number;
     earned: number;
@@ -125,7 +124,7 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   const stashPnl = useMemo(
     () =>
       stashHook.stash
-        .filter((e) => e.sellPriceTotal != null)
+        .filter((e) => e.sellPriceTotal != null && !e.consumedBySellId)
         .reduce((sum, e) => sum + (e.sellPriceTotal! - e.buyPriceTotal), 0),
     [stashHook.stash],
   );
@@ -512,21 +511,7 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
           style={{ animationDelay: "440ms" }}
         >
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="font-display text-lg text-white">Investments</h2>
-              {totalOpenStash > 0 && (
-                <span
-                  className="rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em]"
-                  style={{
-                    background: "rgba(251,191,36,0.15)",
-                    color: "#fbbf24",
-                    border: "1px solid rgba(251,191,36,0.25)",
-                  }}
-                >
-                  {formatCurrency(totalOpenStash)} stashed
-                </span>
-              )}
-            </div>
+            <h2 className="font-display text-lg text-white">Investments</h2>
             <button
               type="button"
               onClick={() => setStashModal("add")}
@@ -536,23 +521,24 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
                 boxShadow: `0 4px 14px -4px ${theme.glow}`,
               }}
             >
-              + Add investment
+              + Buy to stash
             </button>
           </div>
-          <StashTable
+
+          <LiveStash
             user={activeUser}
             stash={stashHook.stash}
-            onSell={(entry) => setSellEntry(entry)}
+            onSell={() => setStashModal("sell")}
             onDelete={stashHook.removeEntry}
           />
 
-          {/* Item profit leaderboard — only shown when there are closed trades */}
-          {stashHook.stash.some((e) => e.sellPriceTotal != null) && (
+          {/* Past trades — shown once there's at least one closed trade */}
+          {stashHook.stash.some((e) => e.sellPriceTotal != null && !e.consumedBySellId) && (
             <div className="mt-6">
               <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
-                Item leaderboard
+                Past Trades
               </div>
-              <StashLeaderboard user={activeUser} stash={stashHook.stash} />
+              <PastTrades user={activeUser} stash={stashHook.stash} />
             </div>
           )}
         </section>
@@ -592,15 +578,17 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
           }}
         />
       )}
-      {sellEntry && (
+      {stashModal === "sell" && (
         <StashModal
           mode="sell"
           user={activeUser}
-          entry={sellEntry}
-          onClose={() => setSellEntry(null)}
-          onConfirm={async (entry) => {
-            setSellEntry(null);
-            await stashHook.updateEntry(entry);
+          openEntries={stashHook.stash.filter(
+            (e) => e.sellPriceTotal == null && e.consumedBySellId == null,
+          )}
+          onClose={() => setStashModal(null)}
+          onConfirm={async (sellEntry, consumed) => {
+            setStashModal(null);
+            await stashHook.updateEntries([sellEntry, ...consumed]);
           }}
         />
       )}
