@@ -98,7 +98,7 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
         return (
           <div
             key={sell.id}
-            className={`relative border-t border-white/5 px-4 py-3 transition-colors ${isHovered ? "bg-white/[0.02]" : ""}`}
+            className="relative border-t border-white/5 px-4 py-3"
             onMouseEnter={() => setHoveredId(sell.id)}
             onMouseLeave={() => setHoveredId(null)}
           >
