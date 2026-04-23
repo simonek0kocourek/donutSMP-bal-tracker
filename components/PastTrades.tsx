@@ -1,6 +1,6 @@
 "use client";
 
-
+import { useState } from "react";
 import type { StashEntry, StashOutputItem, UserId } from "@/lib/types";
 import { USER_THEMES } from "@/lib/types";
 import { formatCurrency, formatSignedCurrency } from "@/lib/utils";
@@ -11,7 +11,6 @@ function fmtDayMonth(iso: string): string {
     return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(iso));
   } catch { return iso; }
 }
-
 
 function fmtDayMonthTime(iso: string): string {
   try {
@@ -34,7 +33,6 @@ function buildTrades(stash: StashEntry[]) {
         .map((id) => byId.get(id))
         .filter(Boolean) as StashEntry[];
       const pnl = sell.sellPriceTotal! - sell.buyPriceTotal;
-      // outputs: use outputItems if present, else synthesise from the entry itself
       const outputs: StashOutputItem[] = sell.outputItems ?? [{
         itemId: sell.itemId,
         itemName: sell.itemName,
@@ -68,6 +66,7 @@ type Props = {
 
 export default function PastTrades({ user, stash, onDelete }: Props) {
   const theme = USER_THEMES[user];
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const trades = buildTrades(stash);
   const maxAbsPnl = Math.max(...trades.map((t) => Math.abs(t.pnl)), 1);
 
@@ -92,13 +91,16 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
       </div>
 
       {trades.map(({ sell, inputs, outputs, pnl }, rank) => {
+        const isHovered = hoveredId === sell.id;
         const isProfit = pnl >= 0;
         const barWidth = (Math.abs(pnl) / maxAbsPnl) * 55;
 
         return (
           <div
             key={sell.id}
-            className="relative border-t border-white/5 px-4 py-3"
+            className={`relative border-t border-white/5 px-4 py-3 transition-colors ${isHovered ? "bg-white/[0.02]" : ""}`}
+            onMouseEnter={() => setHoveredId(sell.id)}
+            onMouseLeave={() => setHoveredId(null)}
           >
             {/* P&L bar */}
             <div
@@ -109,13 +111,13 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
               }}
             />
 
-            {/* Trade row: [inputs stack] → arrow → [outputs stack]        P&L */}
+            {/* Trade row */}
             <div className="relative flex items-center gap-3">
 
               {/* Rank */}
               <span className="w-4 flex-shrink-0 text-center font-mono text-[10px] text-white/25">{rank + 1}</span>
 
-              {/* Left: inputs stacked — icon + name + qty */}
+              {/* Left: inputs stacked — icon + name + qty + buy price */}
               {inputs.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   {inputs.map((inp) => (
@@ -128,15 +130,19 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
                       />
                       <span className="font-display text-sm text-white/80">{inp.itemName}</span>
                       <span className="font-mono text-[10px] text-white/35">×{inp.quantity}</span>
+                      <span className="font-mono text-[10px] text-white/20">{formatCurrency(inp.buyPriceTotal)}</span>
+                      {isHovered && (
+                        <span className="font-mono text-[10px] text-white/20">&middot; {fmtDayMonthTime(inp.buyTime)}</span>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Arrow — only when there are inputs */}
+              {/* Arrow */}
               {inputs.length > 0 && <SilkArrow color={theme.line} />}
 
-              {/* Right: outputs stacked — icon + name + qty */}
+              {/* Right: outputs stacked — icon + name + qty + sell price */}
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 {outputs.map((out, oi) => (
                   <div key={oi} className="flex items-center gap-1.5">
@@ -148,8 +154,12 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
                     />
                     <span className="truncate font-display text-sm text-white">{out.itemName}</span>
                     <span className="font-mono text-[10px] text-white/35">×{out.quantity}</span>
-                    {oi === 0 && (
-                      <span className="font-mono text-[10px] text-white/25">· {fmtDayMonth(sell.sellTime!)}</span>
+                    <span className="font-mono text-[10px] text-white/20">{formatCurrency(out.sellPriceTotal)}</span>
+                    {isHovered && oi === 0 && (
+                      <span className="font-mono text-[10px] text-white/20">&middot; {fmtDayMonthTime(sell.sellTime!)}</span>
+                    )}
+                    {!isHovered && oi === 0 && (
+                      <span className="font-mono text-[10px] text-white/20">&middot; {fmtDayMonth(sell.sellTime!)}</span>
                     )}
                   </div>
                 ))}
@@ -172,31 +182,6 @@ export default function PastTrades({ user, stash, onDelete }: Props) {
                 del
               </button>
             </div>
-
-            {/* Always-visible: consumed inputs inline */}
-            {inputs.length > 0 && (
-              <div className="mt-1.5 space-y-1">
-                {inputs.map((inp) => (
-                  <div key={inp.id} className="flex items-center gap-2 pl-7">
-                    <img
-                      src={mcItemIconUrl(inp.itemId)}
-                      alt={inp.itemName}
-                      className="h-4 w-4 flex-shrink-0 [image-rendering:pixelated]"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                    />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-white/40">
-                      {inp.itemName} ×{inp.quantity}
-                    </span>
-                    <span className="font-mono text-[10px] tabular-nums text-white/30">
-                      {formatCurrency(inp.buyPriceTotal)}
-                    </span>
-                    <span className="font-mono text-[10px] tabular-nums text-white/20">
-                      {fmtDayMonthTime(inp.buyTime)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         );
       })}
