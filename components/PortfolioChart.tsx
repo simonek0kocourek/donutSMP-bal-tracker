@@ -117,6 +117,20 @@ export default function PortfolioChart({
     return points;
   }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance]);
 
+  const yDomain = useMemo<[number, number]>(() => {
+    const allValues: number[] = [];
+    for (const p of data) {
+      if (p.primary != null) allValues.push(p.primary);
+      if (p.secondary != null) allValues.push(p.secondary);
+    }
+    if (allValues.length === 0) return [0, 1];
+    const min = Math.min(...allValues);
+    const max = Math.max(...allValues);
+    const range = max - min || max * 0.1 || 1;
+    const pad = range * 0.12;
+    return [Math.max(0, min - pad), max + pad];
+  }, [data]);
+
   const monthTicks = useMemo<number[]>(() => {
     if (data.length === 0) return [];
     const seen = new Set<string>();
@@ -234,8 +248,8 @@ export default function PortfolioChart({
               }}
               axisLine={false}
               tickLine={false}
-              width={60}
-              domain={["dataMin - 100", "dataMax + 100"]}
+              width={72}
+              domain={yDomain}
             />
             <Tooltip
               cursor={{ stroke: "rgba(255,255,255,0.2)", strokeDasharray: "3 3" }}
