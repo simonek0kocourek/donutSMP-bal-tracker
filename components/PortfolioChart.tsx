@@ -144,18 +144,29 @@ export default function PortfolioChart({
     return points;
   }, [primarySessions, secondarySessions, primaryActive, primaryLiveBalance, secondaryActive, secondaryLiveBalance, primaryStash, secondaryStash]);
 
-  const yDomain = useMemo<[number, number]>(() => {
+  const { yDomain, yTicks } = useMemo<{ yDomain: [number, number]; yTicks: number[] }>(() => {
     const allValues: number[] = [];
     for (const p of data) {
       if (p.primary != null) allValues.push(p.primary);
       if (p.secondary != null) allValues.push(p.secondary);
     }
-    if (allValues.length === 0) return [0, 1];
-    const min = Math.min(...allValues);
-    const max = Math.max(...allValues);
-    const range = max - min || max * 0.1 || 1;
-    const pad = range * 0.12;
-    return [Math.max(0, min - pad), max + pad];
+    if (allValues.length === 0) return { yDomain: [0, 1], yTicks: [0, 0.25, 0.5, 0.75, 1] };
+
+    const rawMin = Math.min(...allValues);
+    const rawMax = Math.max(...allValues);
+    const rawRange = rawMax - rawMin || rawMax * 0.1 || 1;
+
+    // Pick a step that gives exactly 4 intervals (5 ticks) and is a "round" number
+    const roughStep = rawRange / 4;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const niceStep = Math.ceil(roughStep / magnitude) * magnitude;
+
+    // Snap bottom down and top up to multiples of niceStep
+    const bottom = Math.floor(rawMin / niceStep) * niceStep;
+    const top = bottom + niceStep * 4;
+
+    const ticks = [0, 1, 2, 3, 4].map((i) => bottom + i * niceStep);
+    return { yDomain: [bottom, top] as [number, number], yTicks: ticks };
   }, [data]);
 
   const monthTicks = useMemo<number[]>(() => {
@@ -252,6 +263,8 @@ export default function PortfolioChart({
               tickLine={false}
               width={72}
               domain={yDomain}
+              ticks={yTicks}
+              tickCount={5}
             />
             <Tooltip
               cursor={{ stroke: "rgba(255,255,255,0.2)", strokeDasharray: "3 3" }}

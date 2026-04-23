@@ -48,32 +48,50 @@ type Props = AddProps | SellProps;
 
 export default function StashModal(props: Props) {
   const theme = USER_THEMES[props.user];
+  const [visible, setVisible] = useState(false);
 
-  // Lock page scroll while modal is open
+  // Fade in on mount
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // Lock page scroll
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  // Animate out then call real onClose
+  const close = () => {
+    setVisible(false);
+    setTimeout(props.onClose, 220);
+  };
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") props.onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [props]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
-      onClick={props.onClose}
+      onClick={close}
+      style={{
+        transition: "opacity 220ms ease",
+        opacity: visible ? 1 : 0,
+      }}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
 
-      {/* Sheet — fixed height with internal scroll, never grows the page */}
+      {/* Sheet */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm animate-scale-in rounded-t-2xl border border-white/15 sm:rounded-2xl"
+        className="relative w-full max-w-sm rounded-t-2xl border border-white/15 sm:rounded-2xl"
         style={{
           background: "rgba(10,10,18,0.92)",
           backdropFilter: "blur(24px)",
@@ -81,12 +99,15 @@ export default function StashModal(props: Props) {
           boxShadow: `0 0 0 1px rgba(255,255,255,0.06), 0 24px 80px -16px ${theme.glow}, 0 8px 32px rgba(0,0,0,0.6)`,
           maxHeight: "92dvh",
           overflowY: "auto",
+          transition: "transform 220ms cubic-bezier(0.32,0.72,0,1), opacity 220ms ease",
+          transform: visible ? "translateY(0) scale(1)" : "translateY(16px) scale(0.97)",
+          opacity: visible ? 1 : 0,
         }}
       >
         {props.mode === "add" ? (
-          <AddForm {...props} theme={theme} />
+          <AddForm {...props} onClose={close} theme={theme} />
         ) : (
-          <SellForm {...props} theme={theme} />
+          <SellForm {...props} onClose={close} theme={theme} />
         )}
       </div>
     </div>
