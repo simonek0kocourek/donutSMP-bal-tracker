@@ -9,16 +9,10 @@ const LiquidEther = dynamic(() => import("./LiquidEther"), {
 
 export interface LiquidEtherBackgroundProps {
   colors?: string[];
-  color0?: string;
-  color1?: string;
-  color2?: string;
 }
 
 export default function LiquidEtherBackground({
   colors = ["#5227FF", "#FF9FFC", "#B497CF"],
-  color0 = "#5227FF",
-  color1 = "#FF9FFC",
-  color2 = "#B497CF",
 }: LiquidEtherBackgroundProps) {
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative" }}>
@@ -38,9 +32,6 @@ export default function LiquidEtherBackground({
         takeoverDuration={0.25}
         autoResumeDelay={3000}
         autoRampDuration={0.6}
-        color0={color0}
-        color1={color1}
-        color2={color2}
       />
     </div>
   );

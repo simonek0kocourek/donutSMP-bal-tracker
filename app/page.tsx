@@ -26,9 +26,6 @@ export default function SignInPage() {
       <div className="pointer-events-none absolute inset-0 z-0">
         <LiquidEtherBackground
           colors={["#6d28d9", "#374151", "#000000"]}
-          color0="#6d28d9"
-          color1="#374151"
-          color2="#000000"
         />
       </div>
 
