@@ -33,15 +33,29 @@ export function formatSignedCurrency(value: number): string {
 
 export function parseDecimalInput(raw: string): number | null {
   if (typeof raw !== "string") return null;
-  const trimmed = raw.trim().replace(/[^0-9.,-]/g, "");
+  const trimmed = raw.trim();
   if (!trimmed) return null;
-  const lastComma = trimmed.lastIndexOf(",");
-  const lastDot = trimmed.lastIndexOf(".");
+
+  // Check for shorthand suffixes: m/M = million (×1e6), b/B = billion (×1e9)
+  const shorthand = trimmed.match(/^([0-9.,]+)\s*([mMbB])$/);
+  if (shorthand) {
+    const numPart = shorthand[1]!;
+    const suffix = shorthand[2]!.toLowerCase();
+    const base = parseDecimalInput(numPart);
+    if (base === null) return null;
+    const multiplier = suffix === "b" ? 1_000_000_000 : 1_000_000;
+    return base * multiplier;
+  }
+
+  const stripped = trimmed.replace(/[^0-9.,-]/g, "");
+  if (!stripped) return null;
+  const lastComma = stripped.lastIndexOf(",");
+  const lastDot = stripped.lastIndexOf(".");
   let normalized: string;
   if (lastComma > lastDot) {
-    normalized = trimmed.replace(/\./g, "").replace(",", ".");
+    normalized = stripped.replace(/\./g, "").replace(",", ".");
   } else {
-    normalized = trimmed.replace(/,/g, "");
+    normalized = stripped.replace(/,/g, "");
   }
   const n = Number(normalized);
   if (!Number.isFinite(n)) return null;
