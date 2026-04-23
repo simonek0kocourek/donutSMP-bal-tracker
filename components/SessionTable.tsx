@@ -47,7 +47,7 @@ export default function SessionTable({ user, sessions, onDelete }: Props) {
               <th className="px-4 py-3 text-right">Start</th>
               <th className="px-4 py-3 text-right">End</th>
               <th className="px-4 py-3 text-right">Earned</th>
-              <th className="px-4 py-3 text-right">€/hr</th>
+              <th className="px-4 py-3 text-right">$/hr</th>
               <th className="px-4 py-3 text-right" />
             </tr>
           </thead>

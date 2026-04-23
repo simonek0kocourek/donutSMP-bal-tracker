@@ -79,7 +79,7 @@ export default function SessionModal(props: Props) {
             {isEnd ? "Your ending balance" : "Your current balance"}
           </span>
           <div className="mt-2 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-3 focus-within:border-white/30">
-            <span className="font-display text-lg text-white/60">€</span>
+            <span className="font-display text-lg text-white/60">$</span>
             <input
               ref={inputRef}
               type="text"
@@ -90,7 +90,7 @@ export default function SessionModal(props: Props) {
                 setRaw(e.target.value);
                 setError(null);
               }}
-              placeholder="0,00"
+              placeholder="0.00"
               className="w-full bg-transparent font-display text-xl text-white outline-none placeholder:text-white/20"
             />
           </div>

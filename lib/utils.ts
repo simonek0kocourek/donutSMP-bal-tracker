@@ -1,26 +1,26 @@
 import type { Session } from "./types";
 
-const EURO_FORMATTER = new Intl.NumberFormat("de-DE", {
+const EURO_FORMATTER = new Intl.NumberFormat("en-US", {
   style: "currency",
-  currency: "EUR",
+  currency: "USD",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const COMPACT_EURO = new Intl.NumberFormat("de-DE", {
+const COMPACT_EURO = new Intl.NumberFormat("en-US", {
   style: "currency",
-  currency: "EUR",
+  currency: "USD",
   notation: "compact",
   maximumFractionDigits: 1,
 });
 
 export function formatCurrency(value: number): string {
-  if (!Number.isFinite(value)) return "€0,00";
+  if (!Number.isFinite(value)) return "$0.00";
   return EURO_FORMATTER.format(value);
 }
 
 export function formatCurrencyCompact(value: number): string {
-  if (!Number.isFinite(value)) return "€0";
+  if (!Number.isFinite(value)) return "$0";
   return COMPACT_EURO.format(value);
 }
 
@@ -119,7 +119,7 @@ export function firstSession(sessions: Session[]): Session | null {
 
 export function formatDateShort(iso: string): string {
   try {
-    return new Intl.DateTimeFormat("de-DE", {
+    return new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -131,7 +131,7 @@ export function formatDateShort(iso: string): string {
 
 export function formatTime(iso: string): string {
   try {
-    return new Intl.DateTimeFormat("de-DE", {
+    return new Intl.DateTimeFormat("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(iso));
@@ -142,7 +142,7 @@ export function formatTime(iso: string): string {
 
 export function formatDateTime(iso: string): string {
   try {
-    return new Intl.DateTimeFormat("de-DE", {
+    return new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
       month: "short",
       hour: "2-digit",

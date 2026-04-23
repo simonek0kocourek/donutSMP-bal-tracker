@@ -377,7 +377,7 @@ function DashboardInner() {
                 </div>
                 <div>
                   <div className="text-[9px] uppercase tracking-[0.2em] text-white/40">
-                    €/hr
+                    $/hr
                   </div>
                   <div
                     className="mt-1 font-display text-base"
@@ -423,7 +423,7 @@ function DashboardInner() {
             accentColor={theme.accent}
           />
           <StatCard
-            label="Avg €/hr"
+            label="Avg $/hr"
             value={formatCurrency(avgHourly)}
             tone="accent"
             accentColor={theme.accent}

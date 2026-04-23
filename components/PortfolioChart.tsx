@@ -294,7 +294,7 @@ export default function PortfolioChart({
                         </div>
                         {point.primaryHourlyRate != null && (
                           <div className="flex justify-between gap-4">
-                            <span>€/hr</span>
+                            <span>$/hr</span>
                             <span style={{ color: primaryTheme.line }}>
                               {formatCurrency(point.primaryHourlyRate)}
                             </span>

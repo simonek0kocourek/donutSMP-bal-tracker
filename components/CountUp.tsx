@@ -21,29 +21,28 @@ export default function CountUp({
   className,
   style,
 }: Props) {
-  const [display, setDisplay] = useState<number>(value);
+  const [display, setDisplay] = useState<number>(0);
   const frameRef = useRef<number | null>(null);
-  const startRef = useRef<number>(0);
-  const fromRef = useRef<number>(value);
-  const toRef = useRef<number>(value);
+  const prevValueRef = useRef<number>(0);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
-    if (display === value) return;
-    fromRef.current = display;
-    toRef.current = value;
-    startRef.current = performance.now();
+    const from = mountedRef.current ? prevValueRef.current : 0;
+    mountedRef.current = true;
+    prevValueRef.current = value;
+
     if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+    const startTime = performance.now();
+
     const tick = (now: number) => {
-      const elapsed = now - startRef.current;
+      const elapsed = now - startTime;
       const t = Math.min(1, elapsed / duration);
       const eased = easeOutCubic(t);
-      const current =
-        fromRef.current + (toRef.current - fromRef.current) * eased;
-      setDisplay(current);
+      setDisplay(from + (value - from) * eased);
       if (t < 1) {
         frameRef.current = requestAnimationFrame(tick);
       } else {
-        setDisplay(toRef.current);
+        setDisplay(value);
         frameRef.current = null;
       }
     };
@@ -51,7 +50,8 @@ export default function CountUp({
     return () => {
       if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
     };
-  }, [value, duration, display]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, duration]);
 
   return (
     <span className={className} style={style}>
