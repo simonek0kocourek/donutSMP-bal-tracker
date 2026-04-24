@@ -374,6 +374,8 @@ function SellForm({
   const [outputs, setOutputs] = useState<OutputRow[]>([newOutputRow()]);
   // Map of entry id → selected quantity to consume (0 = not selected)
   const [consumedQtys, setConsumedQtys] = useState<Map<string, number>>(new Map());
+  // Raw text inputs for the qty boxes (so user can type freely without snapping)
+  const [qtyInputs, setQtyInputs] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().toISOString());
 
@@ -406,6 +408,15 @@ function SellForm({
         next.delete(entry.id);
       } else {
         next.set(entry.id, entry.quantity);
+      }
+      return next;
+    });
+    setQtyInputs((prev) => {
+      const next = new Map(prev);
+      if ((consumedQtys.get(entry.id) ?? 0) > 0) {
+        next.delete(entry.id);
+      } else {
+        next.set(entry.id, String(entry.quantity));
       }
       return next;
     });
@@ -662,43 +673,73 @@ function SellForm({
                   </button>
 
                   {/* Slider — expands when checked */}
-                  <div
-                    className="overflow-hidden transition-all duration-300 ease-out"
-                    style={{ maxHeight: checked ? "100px" : "0px" }}
-                  >
-                    <div className="px-4 pb-3 pt-1">
-                      <input
-                        type="range"
-                        min={1}
-                        max={entry.quantity}
-                        step={1}
-                        value={selectedQty || entry.quantity}
-                        onChange={(e) => setConsumedQty(entry.id, Number(e.target.value))}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full accent-current"
-                        style={{ accentColor: theme.line }}
-                      />
-                      <div className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[10px] text-white/40">
-                        <span className="tabular-nums">×1</span>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={selectedQty || entry.quantity}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            const raw = e.target.value.trim();
-                            const parsed = parseStackInput(raw, entry.quantity);
-                            if (parsed !== null) setConsumedQty(entry.id, parsed);
-                          }}
-                          className="w-16 rounded border border-white/15 bg-white/5 px-2 py-0.5 text-center text-white/80 outline-none focus:border-white/30"
-                        />
-                        <span className="tabular-nums">×{entry.quantity}</span>
+                  {(() => {
+                    const rawInput = qtyInputs.get(entry.id) ?? String(entry.quantity);
+                    const stackMatch = rawInput.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)s$/);
+                    const stackPreviewQty = stackMatch ? Math.round(parseFloat(stackMatch[1]) * 64) : null;
+                    const clampedPreview = stackPreviewQty !== null ? Math.min(stackPreviewQty, entry.quantity) : null;
+                    return (
+                      <div
+                        className="overflow-hidden transition-all duration-300 ease-out"
+                        style={{ maxHeight: checked ? "110px" : "0px" }}
+                      >
+                        <div className="px-4 pb-3 pt-1">
+                          <input
+                            type="range"
+                            min={1}
+                            max={entry.quantity}
+                            step={1}
+                            value={selectedQty || entry.quantity}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              setConsumedQty(entry.id, n);
+                              setQtyInputs((prev) => new Map(prev).set(entry.id, String(n)));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full accent-current"
+                            style={{ accentColor: theme.line }}
+                          />
+                          <div className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[10px] text-white/40">
+                            <span className="tabular-nums">×1</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={rawInput}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setQtyInputs((prev) => new Map(prev).set(entry.id, raw));
+                                // Only commit if it's a plain number (not mid-typing "s")
+                                const parsed = parseStackInput(raw, entry.quantity);
+                                if (parsed !== null && !raw.trim().toLowerCase().endsWith("s")) {
+                                  setConsumedQty(entry.id, parsed);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const parsed = parseStackInput(e.target.value, entry.quantity);
+                                if (parsed !== null) {
+                                  setConsumedQty(entry.id, parsed);
+                                  setQtyInputs((prev) => new Map(prev).set(entry.id, String(parsed)));
+                                } else {
+                                  // Reset to current valid qty
+                                  setQtyInputs((prev) => new Map(prev).set(entry.id, String(selectedQty || entry.quantity)));
+                                }
+                              }}
+                              className="w-16 rounded border border-white/15 bg-white/5 px-2 py-0.5 text-center text-white/80 outline-none focus:border-white/30"
+                            />
+                            <span className="tabular-nums">×{entry.quantity}</span>
+                          </div>
+                          {/* Stack preview or cost */}
+                          <div className="mt-1 text-center font-mono text-[10px] tabular-nums text-white/30">
+                            {clampedPreview !== null
+                              ? <>{stackMatch![1]}s = ×{clampedPreview} · {formatCurrency(clampedPreview * pricePerItem)}</>
+                              : formatCurrency((selectedQty || entry.quantity) * pricePerItem)
+                            }
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-1 text-center font-mono text-[10px] text-white/50 tabular-nums">
-                        {formatCurrency((selectedQty || entry.quantity) * pricePerItem)}
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               );
             })}
