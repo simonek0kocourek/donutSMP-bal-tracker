@@ -341,8 +341,13 @@ function AddForm({
           <PriceSwitch
             perStack={perStack}
             onChange={(v) => {
-              const currentQty = parseDecimalInput(qty) ?? 1;
-              setQty(v ? String(currentQty / 64) : String(currentQty * 64));
+              const currentQty = parseDecimalInput(qty);
+              if (currentQty !== null && currentQty > 0) {
+                const converted = v ? currentQty / 64 : currentQty * 64;
+                setQty(Number.isInteger(converted) ? String(converted) : converted.toFixed(2));
+              } else {
+                setQty("");
+              }
               setPerStack(v);
             }}
           />
@@ -647,10 +652,14 @@ function SellForm({
                 <PriceSwitch
                   perStack={row.perStack}
                   onChange={(v) => {
-                    const currentQty = parseDecimalInput(row.qty) ?? 1;
-                    const newQty = v
-                      ? String(currentQty / 64)   // items → stacks
-                      : String(currentQty * 64);  // stacks → items
+                    const currentQty = parseDecimalInput(row.qty);
+                    let newQty = row.qty;
+                    if (currentQty !== null && currentQty > 0) {
+                      const converted = v ? currentQty / 64 : currentQty * 64;
+                      newQty = Number.isInteger(converted) ? String(converted) : converted.toFixed(2);
+                    } else {
+                      newQty = "";
+                    }
                     updateOutput(row.id, { perStack: v, qty: newQty });
                   }}
                 />
