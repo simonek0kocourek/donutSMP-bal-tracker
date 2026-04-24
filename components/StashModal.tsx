@@ -360,7 +360,8 @@ function SellForm({
   theme,
 }: SellProps & { theme: UserTheme }) {
   const [outputs, setOutputs] = useState<OutputRow[]>([newOutputRow()]);
-  const [consumedIds, setConsumedIds] = useState<Set<string>>(new Set());
+  // Map of entry id → selected quantity to consume (0 = not selected)
+  const [consumedQtys, setConsumedQtys] = useState<Map<string, number>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().toISOString());
 
@@ -370,8 +371,12 @@ function SellForm({
   }, []);
 
   const totalCost = openEntries
-    .filter((e) => consumedIds.has(e.id))
-    .reduce((sum, e) => sum + e.buyPriceTotal, 0);
+    .filter((e) => (consumedQtys.get(e.id) ?? 0) > 0)
+    .reduce((sum, e) => {
+      const qty = consumedQtys.get(e.id)!;
+      const pricePerItem = e.buyPriceTotal / e.quantity;
+      return sum + qty * pricePerItem;
+    }, 0);
 
   const totalRevenue = outputs.reduce((sum, o) => {
     const p = parseDecimalInput(o.price);
@@ -382,10 +387,22 @@ function SellForm({
   const allPricesFilled = outputs.every((o) => parseDecimalInput(o.price) !== null && o.price.trim() !== "");
   const previewPnl = allPricesFilled ? totalRevenue - totalCost : null;
 
-  const toggleConsumed = (id: string) => {
-    setConsumedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+  const toggleConsumed = (entry: StashEntry) => {
+    setConsumedQtys((prev) => {
+      const next = new Map(prev);
+      if ((next.get(entry.id) ?? 0) > 0) {
+        next.delete(entry.id);
+      } else {
+        next.set(entry.id, entry.quantity);
+      }
+      return next;
+    });
+  };
+
+  const setConsumedQty = (id: string, qty: number) => {
+    setConsumedQtys((prev) => {
+      const next = new Map(prev);
+      if (qty <= 0) next.delete(id); else next.set(id, qty);
       return next;
     });
   };
@@ -411,7 +428,6 @@ function SellForm({
 
     const ts = new Date().toISOString();
     const sellId = newId();
-    const consumed = openEntries.filter((e) => consumedIds.has(e.id));
 
     const outputItems = outputs.map((o) => {
       const q = parseDecimalInput(o.qty)!;
@@ -426,6 +442,47 @@ function SellForm({
 
     const totalSell = outputItems.reduce((s, o) => s + o.sellPriceTotal, 0);
 
+    // Build consumed entries — split if partial qty selected
+    const allUpdated: StashEntry[] = [];
+    const consumedIds: string[] = [];
+
+    for (const entry of openEntries) {
+      const selectedQty = consumedQtys.get(entry.id) ?? 0;
+      if (selectedQty <= 0) continue;
+      const pricePerItem = entry.buyPriceTotal / entry.quantity;
+      const isPartial = selectedQty < entry.quantity;
+
+      if (isPartial) {
+        // Consumed fragment
+        const consumedId = newId();
+        consumedIds.push(consumedId);
+        allUpdated.push({
+          ...entry,
+          id: consumedId,
+          quantity: selectedQty,
+          buyPriceTotal: selectedQty * pricePerItem,
+          sellPriceTotal: 0,
+          sellTime: ts,
+          consumedBySellId: sellId,
+        });
+        // Remaining fragment — updates original entry in place
+        allUpdated.push({
+          ...entry,
+          quantity: entry.quantity - selectedQty,
+          buyPriceTotal: (entry.quantity - selectedQty) * pricePerItem,
+        });
+      } else {
+        // Full consume — mark original
+        consumedIds.push(entry.id);
+        allUpdated.push({
+          ...entry,
+          sellPriceTotal: 0,
+          sellTime: ts,
+          consumedBySellId: sellId,
+        });
+      }
+    }
+
     // Primary display item = first output
     const primary = outputs[0]!;
     const sellEntry: StashEntry = {
@@ -438,17 +495,10 @@ function SellForm({
       sellPriceTotal: totalSell,
       sellTime: ts,
       outputItems,
-      consumedEntryIds: consumed.map((e) => e.id),
+      consumedEntryIds: consumedIds,
     };
 
-    const closedInputs: StashEntry[] = consumed.map((e) => ({
-      ...e,
-      sellPriceTotal: 0,
-      sellTime: ts,
-      consumedBySellId: sellId,
-    }));
-
-    onConfirm(sellEntry, closedInputs);
+    onConfirm(sellEntry, allUpdated);
   };
 
   return (
@@ -555,49 +605,83 @@ function SellForm({
             Select what was consumed
             <span className="ml-2 text-white/25">(optional)</span>
           </div>
-          <div className="max-h-44 overflow-y-auto rounded-xl border border-white/10" style={{ background: "rgba(255,255,255,0.03)" }}>
+          <div className="rounded-xl border border-white/10" style={{ background: "rgba(255,255,255,0.03)" }}>
             {openEntries.map((entry, i) => {
-              const checked = consumedIds.has(entry.id);
+              const selectedQty = consumedQtys.get(entry.id) ?? 0;
+              const checked = selectedQty > 0;
+              const pricePerItem = entry.buyPriceTotal / entry.quantity;
+
               return (
-                <button
+                <div
                   key={entry.id}
-                  type="button"
-                  onClick={() => toggleConsumed(entry.id)}
-                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${i !== 0 ? "border-t border-white/5" : ""} ${checked ? "bg-white/5" : "hover:bg-white/[0.04]"}`}
+                  className={`${i !== 0 ? "border-t border-white/5" : ""}`}
                 >
-                  <div
-                    className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-all"
-                    style={{
-                      borderColor: checked ? theme.line : "rgba(255,255,255,0.2)",
-                      background: checked ? theme.gradientFrom : "transparent",
-                    }}
+                  {/* Row */}
+                  <button
+                    type="button"
+                    onClick={() => toggleConsumed(entry)}
+                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${checked ? "bg-white/5" : "hover:bg-white/[0.04]"}`}
                   >
-                    {checked && (
-                      <svg viewBox="0 0 10 8" className="h-2.5 w-2.5">
-                        <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </div>
-                  <img
-                    src={mcItemIconUrl(entry.itemId)}
-                    alt={entry.itemName}
-                    className="h-6 w-6 flex-shrink-0 [image-rendering:pixelated]"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono text-xs text-white">{entry.itemName}</div>
-                    <div className="font-mono text-[10px] text-white/35">
-                      ×{entry.quantity} · {formatCurrency(entry.buyPriceTotal)}
+                    <div
+                      className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-all"
+                      style={{
+                        borderColor: checked ? theme.line : "rgba(255,255,255,0.2)",
+                        background: checked ? theme.gradientFrom : "transparent",
+                      }}
+                    >
+                      {checked && (
+                        <svg viewBox="0 0 10 8" className="h-2.5 w-2.5">
+                          <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <img
+                      src={mcItemIconUrl(entry.itemId)}
+                      alt={entry.itemName}
+                      className="h-6 w-6 flex-shrink-0 [image-rendering:pixelated]"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-mono text-xs text-white">{entry.itemName}</div>
+                      <div className="font-mono text-[10px] text-white/35">
+                        ×{entry.quantity} · {formatCurrency(entry.buyPriceTotal)}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Slider — expands when checked */}
+                  <div
+                    className="overflow-hidden transition-all duration-300 ease-out"
+                    style={{ maxHeight: checked ? "64px" : "0px" }}
+                  >
+                    <div className="px-4 pb-3 pt-1">
+                      <input
+                        type="range"
+                        min={1}
+                        max={entry.quantity}
+                        step={1}
+                        value={selectedQty || entry.quantity}
+                        onChange={(e) => setConsumedQty(entry.id, Number(e.target.value))}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full accent-current"
+                        style={{ accentColor: theme.line }}
+                      />
+                      <div className="mt-0.5 flex justify-between font-mono text-[10px] text-white/40">
+                        <span>×{selectedQty || entry.quantity} consuming</span>
+                        <span className="tabular-nums text-white/60">
+                          {formatCurrency((selectedQty || entry.quantity) * pricePerItem)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
 
-          {consumedIds.size > 0 && (
+          {consumedQtys.size > 0 && (
             <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/50">
-              <span>{consumedIds.size} consumed · cost basis</span>
+              <span>{consumedQtys.size} consumed · cost basis</span>
               <span className="tabular-nums">{formatCurrency(totalCost)}</span>
             </div>
           )}
