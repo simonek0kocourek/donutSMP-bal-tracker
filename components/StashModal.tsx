@@ -227,9 +227,6 @@ function ItemSearch({
         </div>
       )}
 
-      {showDropdown && results.length > 0 && (
-        <div style={{ height: Math.min(results.length * 44, 208) + 8 }} />
-      )}
     </div>
   );
 }
@@ -241,12 +238,30 @@ function PriceSwitch({ perStack, onChange }: { perStack: boolean; onChange: (v: 
     <button
       type="button"
       onClick={() => onChange(!perStack)}
-      className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors"
-      style={{ background: perStack ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)", color: perStack ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}
+      className="relative flex items-center rounded-full border border-white/10 p-0.5 font-mono text-[9px] uppercase tracking-[0.12em] transition-colors"
+      style={{ background: "rgba(255,255,255,0.04)", gap: 0 }}
     >
-      <span style={{ opacity: perStack ? 0.4 : 1 }}>/ item</span>
-      <span className="text-white/20">·</span>
-      <span style={{ opacity: perStack ? 1 : 0.4 }}>/ stack</span>
+      {/* sliding pill */}
+      <span
+        className="absolute top-0.5 bottom-0.5 rounded-full transition-all duration-200"
+        style={{
+          width: "calc(50% - 2px)",
+          left: perStack ? "calc(50% + 1px)" : "2px",
+          background: "rgba(255,255,255,0.12)",
+        }}
+      />
+      <span
+        className="relative z-10 px-2.5 py-0.5 transition-colors duration-200"
+        style={{ color: perStack ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.8)" }}
+      >
+        Item
+      </span>
+      <span
+        className="relative z-10 px-2.5 py-0.5 transition-colors duration-200"
+        style={{ color: perStack ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)" }}
+      >
+        Stack
+      </span>
     </button>
   );
 }
@@ -323,7 +338,14 @@ function AddForm({
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
             {perStack ? "Price per stack" : "Price per item"}
           </span>
-          <PriceSwitch perStack={perStack} onChange={setPerStack} />
+          <PriceSwitch
+            perStack={perStack}
+            onChange={(v) => {
+              const currentQty = parseDecimalInput(qty) ?? 1;
+              setQty(v ? String(currentQty / 64) : String(currentQty * 64));
+              setPerStack(v);
+            }}
+          />
         </div>
         <div
           className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
@@ -622,7 +644,16 @@ function SellForm({
                 </div>
               </div>
               <div className="mt-1.5 flex items-center justify-between">
-                <PriceSwitch perStack={row.perStack} onChange={(v) => updateOutput(row.id, { perStack: v })} />
+                <PriceSwitch
+                  perStack={row.perStack}
+                  onChange={(v) => {
+                    const currentQty = parseDecimalInput(row.qty) ?? 1;
+                    const newQty = v
+                      ? String(currentQty / 64)   // items → stacks
+                      : String(currentQty * 64);  // stacks → items
+                    updateOutput(row.id, { perStack: v, qty: newQty });
+                  }}
+                />
                 {(() => {
                   const q = parseDecimalInput(row.qty) ?? 0;
                   const p = parseDecimalInput(row.price);
