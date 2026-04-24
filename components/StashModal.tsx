@@ -6,6 +6,18 @@ import { USER_THEMES } from "@/lib/types";
 import { formatCurrency, formatSignedCurrency, parseDecimalInput } from "@/lib/utils";
 import { mcItemIconUrl, searchMcItems, type McItem } from "@/lib/mcItems";
 
+function parseStackInput(raw: string, max: number): number | null {
+  const s = raw.trim().toLowerCase();
+  const stackMatch = s.match(/^(\d+(?:\.\d+)?)s$/);
+  if (stackMatch) {
+    const n = Math.round(parseFloat(stackMatch[1]) * 64);
+    return Math.min(Math.max(1, n), max);
+  }
+  const n = parseInt(s, 10);
+  if (!isNaN(n)) return Math.min(Math.max(1, n), max);
+  return null;
+}
+
 function newId(): string {
   if (typeof globalThis.crypto !== "undefined" && "randomUUID" in globalThis.crypto) {
     try { return globalThis.crypto.randomUUID(); } catch {}
@@ -652,7 +664,7 @@ function SellForm({
                   {/* Slider — expands when checked */}
                   <div
                     className="overflow-hidden transition-all duration-300 ease-out"
-                    style={{ maxHeight: checked ? "64px" : "0px" }}
+                    style={{ maxHeight: checked ? "100px" : "0px" }}
                   >
                     <div className="px-4 pb-3 pt-1">
                       <input
@@ -666,11 +678,24 @@ function SellForm({
                         className="w-full accent-current"
                         style={{ accentColor: theme.line }}
                       />
-                      <div className="mt-0.5 flex justify-between font-mono text-[10px] text-white/40">
-                        <span>×{selectedQty || entry.quantity} consuming</span>
-                        <span className="tabular-nums text-white/60">
-                          {formatCurrency((selectedQty || entry.quantity) * pricePerItem)}
-                        </span>
+                      <div className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[10px] text-white/40">
+                        <span className="tabular-nums">×1</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={selectedQty || entry.quantity}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const raw = e.target.value.trim();
+                            const parsed = parseStackInput(raw, entry.quantity);
+                            if (parsed !== null) setConsumedQty(entry.id, parsed);
+                          }}
+                          className="w-16 rounded border border-white/15 bg-white/5 px-2 py-0.5 text-center text-white/80 outline-none focus:border-white/30"
+                        />
+                        <span className="tabular-nums">×{entry.quantity}</span>
+                      </div>
+                      <div className="mt-1 text-center font-mono text-[10px] text-white/50 tabular-nums">
+                        {formatCurrency((selectedQty || entry.quantity) * pricePerItem)}
                       </div>
                     </div>
                   </div>

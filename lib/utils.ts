@@ -44,14 +44,14 @@ export function parseDecimalInput(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  // Shorthand: k/K = thousand, m/M = million, b/B = billion
-  const shorthand = trimmed.match(/^([0-9.,]+)\s*([kKmMbB])$/);
+  // Shorthand: k/K = thousand, m/M = million, b/B = billion, s/S = stacks (×64)
+  const shorthand = trimmed.match(/^([0-9.,]+)\s*([kKmMbBsS])$/);
   if (shorthand) {
     const numPart = shorthand[1]!;
     const suffix = shorthand[2]!.toLowerCase();
     const base = parseDecimalInput(numPart);
     if (base === null) return null;
-    const multiplier = suffix === "k" ? 1_000 : suffix === "b" ? 1_000_000_000 : 1_000_000;
+    const multiplier = suffix === "k" ? 1_000 : suffix === "b" ? 1_000_000_000 : suffix === "s" ? 64 : 1_000_000;
     return base * multiplier;
   }
 
