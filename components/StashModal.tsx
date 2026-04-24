@@ -283,7 +283,8 @@ function AddForm({
     return () => window.clearInterval(id);
   }, []);
 
-  const parsedQty = parseDecimalInput(qty) ?? 0;
+  const parsedQtyRaw = parseDecimalInput(qty) ?? 0;
+  const parsedQty = perStack ? parsedQtyRaw * 64 : parsedQtyRaw;
   const parsedPriceRaw = parseDecimalInput(price);
   const parsedPriceEach = parsedPriceRaw !== null ? (perStack ? parsedPriceRaw / 64 : parsedPriceRaw) : null;
   const totalBuy = parsedPriceEach !== null && parsedQty > 0 ? parsedPriceEach * parsedQty : null;
@@ -317,7 +318,9 @@ function AddForm({
       </div>
 
       <label className="mt-4 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Quantity</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
+          {perStack ? "Quantity in stacks" : "Quantity"}
+        </span>
         <div
           className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
           style={{ background: "rgba(255,255,255,0.06)" }}
@@ -326,8 +329,12 @@ function AddForm({
             type="text"
             inputMode="decimal"
             value={qty}
-            onChange={(e) => { setQty(e.target.value); setError(null); }}
-            placeholder="1"
+            onChange={(e) => {
+              const val = perStack ? e.target.value.replace(/[^0-9.]/g, "") : e.target.value;
+              setQty(val);
+              setError(null);
+            }}
+            placeholder={perStack ? "Qty in stacks" : "Qty"}
             className="w-full bg-transparent font-display text-lg text-white outline-none placeholder:text-white/20"
           />
         </div>
@@ -341,13 +348,7 @@ function AddForm({
           <PriceSwitch
             perStack={perStack}
             onChange={(v) => {
-              const currentQty = parseDecimalInput(qty);
-              if (currentQty !== null && currentQty > 0) {
-                const converted = v ? currentQty / 64 : currentQty * 64;
-                setQty(Number.isInteger(converted) ? String(converted) : converted.toFixed(2));
-              } else {
-                setQty("");
-              }
+              setQty("");
               setPerStack(v);
             }}
           />
@@ -368,9 +369,9 @@ function AddForm({
         </div>
       </label>
 
-      {totalBuy !== null && parsedQty > 0 && (
+      {totalBuy !== null && parsedQtyRaw > 0 && (
         <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/45">
-          <span>{formatCurrency(parsedPriceRaw!)} × {perStack ? parsedQty / 64 : parsedQty} =</span>
+          <span>{formatCurrency(parsedPriceRaw!)} × {parsedQtyRaw} =</span>
           <span className="tabular-nums text-white/70">{formatCurrency(totalBuy)}</span>
         </div>
       )}
@@ -443,8 +444,9 @@ function SellForm({
 
   const totalRevenue = outputs.reduce((sum, o) => {
     const p = parseDecimalInput(o.price);
-    const q = parseDecimalInput(o.qty) ?? 1;
-    if (p === null) return sum;
+    const qRaw = parseDecimalInput(o.qty) ?? 0;
+    if (p === null || qRaw === 0) return sum;
+    const q = o.perStack ? qRaw * 64 : qRaw;
     const priceEach = o.perStack ? p / 64 : p;
     return sum + priceEach * q;
   }, 0);
@@ -504,7 +506,8 @@ function SellForm({
     const sellId = newId();
 
     const outputItems = outputs.map((o) => {
-      const q = parseDecimalInput(o.qty)!;
+      const qRaw = parseDecimalInput(o.qty)!;
+      const q = o.perStack ? qRaw * 64 : qRaw;
       const raw = parseDecimalInput(o.price)!;
       const priceEach = o.perStack ? raw / 64 : raw;
       return {
@@ -628,8 +631,12 @@ function SellForm({
                     type="text"
                     inputMode="decimal"
                     value={row.qty}
-                    onChange={(e) => updateOutput(row.id, { qty: e.target.value })}
-                    placeholder="Qty"
+                    onChange={(e) => {
+                      // Only allow digits (no letters like s/k/m when in stack mode)
+                      const val = row.perStack ? e.target.value.replace(/[^0-9.]/g, "") : e.target.value;
+                      updateOutput(row.id, { qty: val });
+                    }}
+                    placeholder={row.perStack ? "Qty in stacks" : "Qty"}
                     className="w-full bg-transparent font-display text-base text-white outline-none placeholder:text-white/20"
                   />
                 </div>
@@ -652,28 +659,20 @@ function SellForm({
                 <PriceSwitch
                   perStack={row.perStack}
                   onChange={(v) => {
-                    const currentQty = parseDecimalInput(row.qty);
-                    let newQty = row.qty;
-                    if (currentQty !== null && currentQty > 0) {
-                      const converted = v ? currentQty / 64 : currentQty * 64;
-                      newQty = Number.isInteger(converted) ? String(converted) : converted.toFixed(2);
-                    } else {
-                      newQty = "";
-                    }
-                    updateOutput(row.id, { perStack: v, qty: newQty });
+                    updateOutput(row.id, { perStack: v, qty: "" });
                   }}
                 />
                 {(() => {
                   const q = parseDecimalInput(row.qty) ?? 0;
                   const p = parseDecimalInput(row.price);
                   if (p === null || q === 0) return null;
+                  // q is already in stacks when perStack, convert to items for total
+                  const qItems = row.perStack ? q * 64 : q;
                   const priceEach = row.perStack ? p / 64 : p;
-                  // When per-stack: show stacks count (items / 64), otherwise show items
-                  const displayQty = row.perStack ? q / 64 : q;
                   return (
                     <div className="font-mono text-[10px] text-white/40">
-                      <span>{formatCurrency(p)} × {displayQty} = </span>
-                      <span className="tabular-nums text-white/60">{formatCurrency(priceEach * q)}</span>
+                      <span>{formatCurrency(p)} × {q} = </span>
+                      <span className="tabular-nums text-white/60">{formatCurrency(priceEach * qItems)}</span>
                     </div>
                   );
                 })()}
