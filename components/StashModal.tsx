@@ -343,11 +343,7 @@ function AddForm({
 
       {totalBuy !== null && parsedQty > 0 && (
         <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/45">
-          <span>
-            {perStack
-              ? `${formatCurrency(parsedPriceRaw!)} / stack × ${parsedQty}`
-              : `${formatCurrency(parsedPriceEach!)} × ${parsedQty}`}
-          </span>
+          <span>{formatCurrency(parsedPriceEach!)} × {parsedQty} =</span>
           <span className="tabular-nums text-white/70">{formatCurrency(totalBuy)}</span>
         </div>
       )}
@@ -634,7 +630,7 @@ function SellForm({
                   const priceEach = row.perStack ? p / 64 : p;
                   return (
                     <div className="font-mono text-[10px] text-white/40">
-                      <span>{row.perStack ? `${formatCurrency(p)}/stack` : formatCurrency(priceEach)} × {q} = </span>
+                      <span>{formatCurrency(priceEach)} × {q} = </span>
                       <span className="tabular-nums text-white/60">{formatCurrency(priceEach * q)}</span>
                     </div>
                   );
