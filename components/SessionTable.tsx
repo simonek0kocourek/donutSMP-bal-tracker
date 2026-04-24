@@ -54,7 +54,8 @@ export default function SessionTable({ user, sessions, onDelete }: Props) {
           <tbody>
             {sorted.map((s, i) => {
               const isConfirming = confirmingId === s.id;
-              const earnedPositive = s.earned >= 0;
+              const truePnl = s.earned + (s.stashBought ?? 0);
+              const earnedPositive = truePnl >= 0;
               return (
                 <tr
                   key={s.id}
@@ -76,7 +77,7 @@ export default function SessionTable({ user, sessions, onDelete }: Props) {
                     className="px-4 py-3 text-right font-display text-base"
                     style={{ color: earnedPositive ? "#4ade80" : "#f87171" }}
                   >
-                    {formatSignedCurrency(s.earned)}
+                    {formatSignedCurrency(truePnl)}
                   </td>
                   <td
                     className="px-4 py-3 text-right font-display text-base"

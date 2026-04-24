@@ -27,7 +27,7 @@ function validateSession(raw: unknown): Session | null {
   ) {
     return null;
   }
-  return {
+  const session: Session = {
     id: s.id,
     date: s.date,
     startBalance: s.startBalance,
@@ -38,6 +38,8 @@ function validateSession(raw: unknown): Session | null {
     earned: s.earned,
     hourlyRate: s.hourlyRate,
   };
+  if (typeof s.stashBought === "number") session.stashBought = s.stashBought;
+  return session;
 }
 
 export async function GET(req: NextRequest) {

@@ -16,6 +16,7 @@ export type Session = {
   durationMinutes: number;
   earned: number;
   hourlyRate: number;
+  stashBought?: number; // total cost of stash entries bought during this session
 };
 
 export type ActiveSession = {

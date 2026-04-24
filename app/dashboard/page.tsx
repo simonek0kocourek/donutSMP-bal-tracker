@@ -110,10 +110,6 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
     [primary.sessions],
   );
 
-  const liquidBalance = active.active
-    ? active.active.startBalance
-    : latest?.endBalance ?? 0;
-
   const totalOpenStash = useMemo(
     () =>
       stashHook.stash
@@ -130,7 +126,20 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
     [stashHook.stash],
   );
 
-  const headlineBalance = liquidBalance;
+  // During an active session, derive live cash from startBalance ± stash activity
+  const liquidBalance = useMemo(() => {
+    if (!active.active) return latest?.endBalance ?? 0;
+    const startMs = new Date(active.active.startTime).getTime();
+    const boughtThisSession = stashHook.stash
+      .filter((e) => new Date(e.buyTime).getTime() >= startMs)
+      .reduce((sum, e) => sum + e.buyPriceTotal, 0);
+    const soldRevenueThisSession = stashHook.stash
+      .filter((e) => e.sellTime != null && new Date(e.sellTime).getTime() >= startMs && !e.consumedBySellId)
+      .reduce((sum, e) => sum + (e.sellPriceTotal ?? 0), 0);
+    return active.active.startBalance - boughtThisSession + soldRevenueThisSession;
+  }, [active.active, stashHook.stash, latest]);
+
+  const headlineBalance = liquidBalance + totalOpenStash;
 
   const annual = useMemo(() => {
     if (!first) return null;
@@ -145,7 +154,7 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
   }, [first, latest]);
 
   const totalEarned = useMemo(
-    () => primary.sessions.reduce((sum, s) => sum + s.earned, 0),
+    () => primary.sessions.reduce((sum, s) => sum + s.earned + (s.stashBought ?? 0), 0),
     [primary.sessions],
   );
   const totalSessions = primary.sessions.length;
@@ -182,6 +191,14 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
     const earned = endBalance - open.startBalance;
     const hourlyRate =
       durationMinutes > 0 ? earned / (durationMinutes / 60) : 0;
+    const startMs = new Date(open.startTime).getTime();
+    const endMs = new Date(endTime).getTime();
+    const stashBought = stashHook.stash
+      .filter((e) => {
+        const t = new Date(e.buyTime).getTime();
+        return t >= startMs && t <= endMs;
+      })
+      .reduce((sum, e) => sum + e.buyPriceTotal, 0);
     const session: Session = {
       id: newSessionId(),
       date: open.startTime.slice(0, 10),
@@ -192,6 +209,7 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
       durationMinutes,
       earned,
       hourlyRate,
+      stashBought,
     };
     await primary.addSession(session);
     await active.clear();
@@ -278,17 +296,27 @@ function DashboardInner({ user }: { user: import("@/lib/types").UserId }) {
           style={{ animationDelay: "60ms" }}
         >
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/50">
-            Portfolio balance
+            Net Worth
           </div>
-          <CountUp
-            value={headlineBalance}
-            format={formatCurrency}
-            className="mt-1 block font-display text-5xl sm:text-6xl"
-            style={{
-              color: "#fff",
-              textShadow: `0 0 30px ${theme.glow}, 0 0 60px ${theme.glow}`,
-            }}
-          />
+          <div className="mt-1 flex items-baseline gap-4">
+            <CountUp
+              value={headlineBalance}
+              format={formatCurrency}
+              className="block font-display text-5xl sm:text-6xl"
+              style={{
+                color: "#fff",
+                textShadow: `0 0 30px ${theme.glow}, 0 0 60px ${theme.glow}`,
+              }}
+            />
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">Balance</span>
+              <CountUp
+                value={liquidBalance}
+                format={formatCurrency}
+                className="font-display text-xl text-white/40"
+              />
+            </div>
+          </div>
         </section>
 
         <section
