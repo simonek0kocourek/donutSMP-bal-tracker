@@ -343,7 +343,7 @@ function AddForm({
 
       {totalBuy !== null && parsedQty > 0 && (
         <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/45">
-          <span>{formatCurrency(parsedPriceEach!)} × {parsedQty} =</span>
+          <span>{formatCurrency(parsedPriceRaw!)} × {perStack ? parsedQty / 64 : parsedQty} =</span>
           <span className="tabular-nums text-white/70">{formatCurrency(totalBuy)}</span>
         </div>
       )}
@@ -628,9 +628,11 @@ function SellForm({
                   const p = parseDecimalInput(row.price);
                   if (p === null || q === 0) return null;
                   const priceEach = row.perStack ? p / 64 : p;
+                  // When per-stack: show stacks count (items / 64), otherwise show items
+                  const displayQty = row.perStack ? q / 64 : q;
                   return (
                     <div className="font-mono text-[10px] text-white/40">
-                      <span>{formatCurrency(priceEach)} × {q} = </span>
+                      <span>{formatCurrency(p)} × {displayQty} = </span>
                       <span className="tabular-nums text-white/60">{formatCurrency(priceEach * q)}</span>
                     </div>
                   );
