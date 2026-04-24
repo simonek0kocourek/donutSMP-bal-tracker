@@ -406,7 +406,7 @@ function AddForm({
 type OutputRow = { id: string; item: McItem | null; qty: string; price: string; perStack: boolean };
 
 function newOutputRow(): OutputRow {
-  return { id: Math.random().toString(36).slice(2), item: null, qty: "1", price: "", perStack: false };
+  return { id: Math.random().toString(36).slice(2), item: null, qty: "", price: "", perStack: false };
 }
 
 function SellForm({
