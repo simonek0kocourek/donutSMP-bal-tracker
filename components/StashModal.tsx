@@ -236,6 +236,21 @@ function ItemSearch({
 
 // ─── Add form ────────────────────────────────────────────────────────────────
 
+function PriceSwitch({ perStack, onChange }: { perStack: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!perStack)}
+      className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.15em] transition-colors"
+      style={{ background: perStack ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)", color: perStack ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}
+    >
+      <span style={{ opacity: perStack ? 0.4 : 1 }}>/ item</span>
+      <span className="text-white/20">·</span>
+      <span style={{ opacity: perStack ? 1 : 0.4 }}>/ stack</span>
+    </button>
+  );
+}
+
 function AddForm({
   onClose,
   onConfirm,
@@ -244,6 +259,7 @@ function AddForm({
   const [selected, setSelected] = useState<McItem | null>(null);
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
+  const [perStack, setPerStack] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().toISOString());
 
@@ -253,7 +269,8 @@ function AddForm({
   }, []);
 
   const parsedQty = parseDecimalInput(qty) ?? 0;
-  const parsedPriceEach = parseDecimalInput(price);
+  const parsedPriceRaw = parseDecimalInput(price);
+  const parsedPriceEach = parsedPriceRaw !== null ? (perStack ? parsedPriceRaw / 64 : parsedPriceRaw) : null;
   const totalBuy = parsedPriceEach !== null && parsedQty > 0 ? parsedPriceEach * parsedQty : null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -302,7 +319,12 @@ function AddForm({
       </label>
 
       <label className="mt-4 block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">Price per item</span>
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
+            {perStack ? "Price per stack" : "Price per item"}
+          </span>
+          <PriceSwitch perStack={perStack} onChange={setPerStack} />
+        </div>
         <div
           className="mt-2 flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 focus-within:border-white/35"
           style={{ background: "rgba(255,255,255,0.06)" }}
@@ -319,9 +341,13 @@ function AddForm({
         </div>
       </label>
 
-      {totalBuy !== null && parsedQty > 1 && (
+      {totalBuy !== null && parsedQty > 0 && (
         <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-white/45">
-          <span>{formatCurrency(parsedPriceEach!)} × {parsedQty} =</span>
+          <span>
+            {perStack
+              ? `${formatCurrency(parsedPriceRaw!)} / stack × ${parsedQty}`
+              : `${formatCurrency(parsedPriceEach!)} × ${parsedQty}`}
+          </span>
           <span className="tabular-nums text-white/70">{formatCurrency(totalBuy)}</span>
         </div>
       )}
@@ -359,10 +385,10 @@ function AddForm({
 
 // ─── Sell form ────────────────────────────────────────────────────────────────
 
-type OutputRow = { id: string; item: McItem | null; qty: string; price: string };
+type OutputRow = { id: string; item: McItem | null; qty: string; price: string; perStack: boolean };
 
 function newOutputRow(): OutputRow {
-  return { id: Math.random().toString(36).slice(2), item: null, qty: "1", price: "" };
+  return { id: Math.random().toString(36).slice(2), item: null, qty: "1", price: "", perStack: false };
 }
 
 function SellForm({
@@ -395,7 +421,9 @@ function SellForm({
   const totalRevenue = outputs.reduce((sum, o) => {
     const p = parseDecimalInput(o.price);
     const q = parseDecimalInput(o.qty) ?? 1;
-    return sum + (p !== null ? p * q : 0);
+    if (p === null) return sum;
+    const priceEach = o.perStack ? p / 64 : p;
+    return sum + priceEach * q;
   }, 0);
 
   const allPricesFilled = outputs.every((o) => parseDecimalInput(o.price) !== null && o.price.trim() !== "");
@@ -454,7 +482,8 @@ function SellForm({
 
     const outputItems = outputs.map((o) => {
       const q = parseDecimalInput(o.qty)!;
-      const priceEach = parseDecimalInput(o.price)!;
+      const raw = parseDecimalInput(o.price)!;
+      const priceEach = o.perStack ? raw / 64 : raw;
       return {
         itemId: o.item!.id,
         itemName: o.item!.name,
@@ -589,26 +618,28 @@ function SellForm({
                   <input
                     type="text"
                     inputMode="decimal"
-                    placeholder="Per item"
+                    placeholder={row.perStack ? "Per stack" : "Per item"}
                     value={row.price}
                     onChange={(e) => updateOutput(row.id, { price: e.target.value })}
                     className="w-full bg-transparent font-display text-base text-white outline-none placeholder:text-white/20"
                   />
                 </div>
               </div>
-              {(() => {
-                const q = parseDecimalInput(row.qty) ?? 0;
-                const p = parseDecimalInput(row.price);
-                if (p !== null && q > 1) {
+              <div className="mt-1.5 flex items-center justify-between">
+                <PriceSwitch perStack={row.perStack} onChange={(v) => updateOutput(row.id, { perStack: v })} />
+                {(() => {
+                  const q = parseDecimalInput(row.qty) ?? 0;
+                  const p = parseDecimalInput(row.price);
+                  if (p === null || q === 0) return null;
+                  const priceEach = row.perStack ? p / 64 : p;
                   return (
-                    <div className="mt-1.5 flex justify-between font-mono text-[10px] text-white/40">
-                      <span>{formatCurrency(p)} × {q}</span>
-                      <span className="tabular-nums text-white/60">{formatCurrency(p * q)}</span>
+                    <div className="font-mono text-[10px] text-white/40">
+                      <span>{row.perStack ? `${formatCurrency(p)}/stack` : formatCurrency(priceEach)} × {q} = </span>
+                      <span className="tabular-nums text-white/60">{formatCurrency(priceEach * q)}</span>
                     </div>
                   );
-                }
-                return null;
-              })()}
+                })()}
+              </div>
             </div>
           ))}
         </div>
