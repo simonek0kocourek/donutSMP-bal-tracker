@@ -426,6 +426,7 @@ function SellForm({
   const [consumedQtys, setConsumedQtys] = useState<Map<string, number>>(new Map());
   // Raw text inputs for the qty boxes (so user can type freely without snapping)
   const [qtyInputs, setQtyInputs] = useState<Map<string, string>>(new Map());
+  const [hoveredConsumeId, setHoveredConsumeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date().toISOString());
 
@@ -711,6 +712,8 @@ function SellForm({
                   <button
                     type="button"
                     onClick={() => toggleConsumed(entry)}
+                    onMouseEnter={() => setHoveredConsumeId(entry.id)}
+                    onMouseLeave={() => setHoveredConsumeId(null)}
                     className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${checked ? "bg-white/5" : "hover:bg-white/[0.04]"}`}
                   >
                     <div
@@ -735,7 +738,15 @@ function SellForm({
                     <div className="min-w-0 flex-1">
                       <div className="font-mono text-xs text-white">{entry.itemName}</div>
                       <div className="font-mono text-[10px] text-white/35">
-                        ×{entry.quantity} · {formatCurrency(entry.buyPriceTotal)}
+                        {hoveredConsumeId === entry.id && entry.quantity >= 64
+                          ? (() => {
+                              const stacks = entry.quantity / 64;
+                              const stacksStr = Number.isInteger(stacks) ? String(stacks) : stacks.toFixed(1);
+                              return `${stacksStr} stacks`;
+                            })()
+                          : `×${entry.quantity}`
+                        }
+                        {" · "}{formatCurrency(entry.buyPriceTotal)}
                       </div>
                     </div>
                   </button>
